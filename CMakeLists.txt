@@ -22,6 +22,7 @@ file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 # Add executable
 add_executable(${PROJECT_NAME}
     src/main.c
+    src/gpio.c
 )
 
 # Include directories
