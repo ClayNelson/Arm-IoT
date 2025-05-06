@@ -1,0 +1,9 @@
+{
+    "cmake.configureOnOpen": true,
+    "cmake.buildDirectory": "${workspaceFolder}/build",
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "cortex-debug.armToolchainPath": "${env:ARM_NONE_EABI_PATH}",
+    "files.associations": {
+        "*.h": "c"
+    }
+}
