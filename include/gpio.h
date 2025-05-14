@@ -16,12 +16,19 @@ typedef enum {
 } gpio_direction_t;
 
 // GPIO initialization
-void gpio_init(uint8_t pin, gpio_direction_t direction);
+int gpio_init(void);
 
 // Set GPIO pin state
-void gpio_write(uint8_t pin, gpio_state_t state);
+void gpio_write(int pin, int value);
 
 // Read GPIO pin state
-gpio_state_t gpio_read(uint8_t pin);
+int gpio_read(int pin);
+
+// Toggle GPIO pin state
+void gpio_toggle(int pin);
+
+// GPIO constants
+#define GPIO_HIGH 1
+#define GPIO_LOW  0
 
 #endif // GPIO_H

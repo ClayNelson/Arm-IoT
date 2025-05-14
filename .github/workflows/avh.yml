@@ -1,0 +1,37 @@
+name: AVH Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up AVH
+        uses: ARM-software/AVH@v0.1
+        with:
+          token: ${{ secrets.AVH_TOKEN }}
+      
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AVH_SSH_PRIVATE_KEY }}" > ~/.ssh/avh_key
+          chmod 600 ~/.ssh/avh_key
+          echo "${{ secrets.AVH_SSH_PUBLIC_KEY }}" > ~/.ssh/avh_key.pub
+          
+      - name: Build
+        run: |
+          cmake -B build -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-avh.cmake
+          cmake --build build
+          
+      - name: Test on AVH
+        run: |
+          avh-run --config avh.yml --timeout 300 build/${PROJECT_NAME}
+        env:
+          AVH_SSH_PUBLIC_KEY: ${{ secrets.AVH_SSH_PUBLIC_KEY }}
+          AVH_TOKEN: ${{ secrets.AVH_TOKEN }}

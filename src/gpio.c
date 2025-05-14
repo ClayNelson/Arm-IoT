@@ -1,22 +1,18 @@
 #include "gpio.h"
-#include <stdio.h>
+#include <pigpio.h>
 
 // Note: This is a simplified implementation for demonstration
 // In a real project, this would interface with actual hardware
 
-static gpio_state_t pin_states[64] = {GPIO_LOW}; // Track pin states
-static gpio_direction_t pin_directions[64] = {GPIO_INPUT}; // Track pin directions
-
-void gpio_init(uint8_t pin, gpio_direction_t direction) {
-    if (pin < 64) {
-        pin_directions[pin] = direction;
-        pin_states[pin] = GPIO_LOW;
-        printf("Initialized GPIO pin %d as %s\n", 
-               pin, 
-               direction == GPIO_INPUT ? "INPUT" : "OUTPUT");
+int gpio_init(void) {
+    if (gpioInitialise() < 0) {
+        return -1;
     }
+    return 0;
 }
 
+void gpio_write(int pin, int value) {
+    gpioWrite(pin, value);
 void gpio_write(uint8_t pin, gpio_state_t state) {
     if (pin < 64 && pin_directions[pin] == GPIO_OUTPUT) {
         pin_states[pin] = state;
