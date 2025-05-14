@@ -33,7 +33,10 @@ add_link_options(
     ${CPU_FLAGS}
     --specs=nosys.specs
     -nostartfiles
+    -nodefaultlibs
+    -nostdlib
     -Wl,--gc-sections
+    -Wl,-Map=${PROJECT_NAME}.map
 )
 
 # Create executable
