@@ -5,20 +5,24 @@ SIZE = arm-none-eabi-size
 TARGET = blink
 BUILD_DIR = build
 
-CFLAGS = -mcpu=cortex-m55 \
-         -mthumb \
-         -mfloat-abi=hard \
-         -mfpu=fpv5-d16 \
+CPU_FLAGS = -mcpu=cortex-m55 \
+           -mthumb \
+           -mfloat-abi=soft
+
+CFLAGS = $(CPU_FLAGS) \
          --specs=nosys.specs \
          -ffunction-sections \
          -fdata-sections \
          -Wall \
          -g3
 
-LDFLAGS = -T gcc_arm.ld \
-          -Wl,--gc-sections
+LDFLAGS = $(CPU_FLAGS) \
+          -T gcc_arm.ld \
+          -Wl,--gc-sections \
+          --specs=nosys.specs \
+          -nostartfiles
 
-SOURCES = src/main.c
+SOURCES = src/startup.c src/main.c
 OBJECTS = $(SOURCES:%.c=$(BUILD_DIR)/%.o)
 
 .PHONY: all clean
