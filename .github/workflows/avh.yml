@@ -1,14 +1,13 @@
-name: AVH Build and Test
+name: Build ARM IoT Application
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
     branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    
     steps:
       - uses: actions/checkout@v3
       
@@ -18,16 +17,6 @@ jobs:
           sudo apt-get install -y gcc-arm-none-eabi
           arm-none-eabi-gcc --version
       
-      - name: Install Corellium CLI
-        run: |
-          curl -L https://downloads.corellium.com/cli/linux/latest/corellium > /usr/local/bin/corellium
-          chmod +x /usr/local/bin/corellium
-      
-      - name: Configure Corellium
-        run: |
-          echo "${{ secrets.AVH_TOKEN }}" > ~/.avh_token
-          corellium login
-      
       - name: Build
         run: |
           mkdir -p build
@@ -35,14 +24,8 @@ jobs:
           cmake ..
           make
       
-      - name: Deploy to AVH
-        run: |
-          echo "Creating AVH instance..."
-          INSTANCE_NAME="arm-iot-test"
-          corellium create-instance --name "$INSTANCE_NAME" --os corellium-linux-5.15 --type virt-arm-1 --wait
-          
-          echo "Uploading binary..."
-          corellium upload-file --instance "$INSTANCE_NAME" --source build/blink --destination /root/blink
-          
-          echo "Running application..."
-          corellium exec --instance "$INSTANCE_NAME" --command "chmod +x /root/blink && /root/blink"
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: arm-iot-binary
+          path: build/blink
