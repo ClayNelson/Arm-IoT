@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdint.h>
 
 // GPIO register definitions for Corstone-300
@@ -22,8 +21,6 @@ static void delay(volatile uint32_t count) {
 int main(void) {
     // Set LED pin as output
     *gpio_dir |= (1U << LED_PIN);
-    
-    printf("LED blinking started. Press Ctrl+C to exit.\n");
     
     while (1) {
         // Toggle LED

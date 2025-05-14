@@ -36,6 +36,7 @@ add_link_options(
     -nodefaultlibs
     -nostdlib
     -Wl,--gc-sections
+    -Wl,-N
     -Wl,-Map=${PROJECT_NAME}.map
 )
 
