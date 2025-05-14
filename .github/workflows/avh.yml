@@ -12,10 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Set up ARM GNU Toolchain
-        uses: carlosperate/arm-none-eabi-gcc-action@v1
-        with:
-          release: '11.3.Rel1'
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi
+          arm-none-eabi-gcc --version
       
       - name: Setup SSH key
         run: |
