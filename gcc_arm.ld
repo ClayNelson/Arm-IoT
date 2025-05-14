@@ -14,6 +14,7 @@ SECTIONS
         *(.text*)
         *(.rodata*)
         . = ALIGN(4);
+        _etext = .;
     } > FLASH
 
     .data :
@@ -25,6 +26,8 @@ SECTIONS
         _edata = .;
     } > RAM AT > FLASH
 
+    _sidata = LOADADDR(.data);
+
     .bss (NOLOAD) :
     {
         . = ALIGN(4);
@@ -33,9 +36,14 @@ SECTIONS
         *(COMMON)
         . = ALIGN(4);
         _ebss = .;
+        . = ALIGN(8);
     } > RAM
 
-    /* Set stack top to end of RAM */
+    . = ALIGN(4);
+    end = .;
+
+    /* Set stack top to end of RAM, aligned to 8 bytes */
+    . = ALIGN(8);
     __stack_top = ORIGIN(RAM) + LENGTH(RAM);
 
     /DISCARD/ :
