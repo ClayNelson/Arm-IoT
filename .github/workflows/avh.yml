@@ -12,10 +12,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Set up AVH
-        uses: ARM-software/AVH@v0.1
+      - name: Set up ARM GNU Toolchain
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
         with:
-          token: ${{ secrets.AVH_TOKEN }}
+          release: '11.3.Rel1'
+      
+      - name: Install Corellium CLI
+        run: |
+          curl -L https://downloads.corellium.com/cli/linux/latest/corellium > /usr/local/bin/corellium
+          chmod +x /usr/local/bin/corellium
       
       - name: Setup SSH key
         run: |
@@ -29,9 +34,13 @@ jobs:
           cmake -B build -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-avh.cmake
           cmake --build build
           
-      - name: Test on AVH
+      - name: Deploy and Test on AVH
         run: |
-          avh-run --config avh.yml --timeout 300 build/${PROJECT_NAME}
+          corellium login --token ${{ secrets.CORELLIUM_API_TOKEN }}
+          corellium instance create --project ${{ secrets.CORELLIUM_PROJECT_ID }} --flavor arm-virt --os corellium-linux-dev
+          corellium instance wait-ready
+          corellium instance upload build/${PROJECT_NAME} /root/
+          corellium instance exec "chmod +x /root/${PROJECT_NAME} && /root/${PROJECT_NAME}"
         env:
-          AVH_SSH_PUBLIC_KEY: ${{ secrets.AVH_SSH_PUBLIC_KEY }}
-          AVH_TOKEN: ${{ secrets.AVH_TOKEN }}
+          CORELLIUM_API_TOKEN: ${{ secrets.CORELLIUM_API_TOKEN }}
+          CORELLIUM_PROJECT_ID: ${{ secrets.CORELLIUM_PROJECT_ID }}
