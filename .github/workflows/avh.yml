@@ -17,17 +17,12 @@ jobs:
         with:
           release: '11.3.Rel1'
       
-      - name: Install Corellium CLI
-        run: |
-          curl -L https://downloads.corellium.com/cli/linux/latest/corellium > /usr/local/bin/corellium
-          chmod +x /usr/local/bin/corellium
-      
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.AVH_SSH_PRIVATE_KEY }}" > ~/.ssh/avh_key
-          chmod 600 ~/.ssh/avh_key
-          echo "${{ secrets.AVH_SSH_PUBLIC_KEY }}" > ~/.ssh/avh_key.pub
+          echo "${{ secrets.AVH_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo "${{ secrets.AVH_SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
           
       - name: Build
         run: |
@@ -36,11 +31,10 @@ jobs:
           
       - name: Deploy and Test on AVH
         run: |
-          corellium login --token ${{ secrets.CORELLIUM_API_TOKEN }}
-          corellium instance create --project ${{ secrets.CORELLIUM_PROJECT_ID }} --flavor arm-virt --os corellium-linux-dev
-          corellium instance wait-ready
-          corellium instance upload build/${PROJECT_NAME} /root/
-          corellium instance exec "chmod +x /root/${PROJECT_NAME} && /root/${PROJECT_NAME}"
+          ssh -o StrictHostKeyChecking=no -J ${{ secrets.AVH_USER }}@proxy.app.avh.corellium.com pi@10.11.0.1 'mkdir -p ~/app'
+          scp -o StrictHostKeyChecking=no -J ${{ secrets.AVH_USER }}@proxy.app.avh.corellium.com build/blink pi@10.11.0.1:~/app/
+          ssh -o StrictHostKeyChecking=no -J ${{ secrets.AVH_USER }}@proxy.app.avh.corellium.com pi@10.11.0.1 'chmod +x ~/app/blink && ~/app/blink'
         env:
-          CORELLIUM_API_TOKEN: ${{ secrets.CORELLIUM_API_TOKEN }}
-          CORELLIUM_PROJECT_ID: ${{ secrets.CORELLIUM_PROJECT_ID }}
+          AVH_SSH_PRIVATE_KEY: ${{ secrets.AVH_SSH_PRIVATE_KEY }}
+          AVH_SSH_PUBLIC_KEY: ${{ secrets.AVH_SSH_PUBLIC_KEY }}
+          AVH_USER: ${{ secrets.AVH_USER }}

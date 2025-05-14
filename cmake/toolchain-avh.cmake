@@ -6,13 +6,12 @@ set(CMAKE_C_COMPILER arm-none-eabi-gcc)
 set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
 set(CMAKE_ASM_COMPILER arm-none-eabi-gcc)
 
-# Compiler flags
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=cortex-m55 -mthumb --specs=nosys.specs")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=cortex-m55 -mthumb --specs=nosys.specs")
-set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -mcpu=cortex-m55 -mthumb")
-
 # This is required to prevent CMake from trying to run test programs
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+
+# Compiler flags
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=cortex-m55 -mthumb -mfloat-abi=hard -mfpu=fpv5-d16 --specs=nosys.specs -ffunction-sections -fdata-sections -Wall")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections")
 
 # Search for programs in the build host directories
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
