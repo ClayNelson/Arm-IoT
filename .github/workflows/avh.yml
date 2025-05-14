@@ -9,8 +9,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      AVH_USER: ${{ secrets.AVH_USER }}
     steps:
       - uses: actions/checkout@v3
       
@@ -20,14 +18,15 @@ jobs:
           sudo apt-get install -y gcc-arm-none-eabi
           arm-none-eabi-gcc --version
       
-      - name: Setup SSH key
+      - name: Install Corellium CLI
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.AVH_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          echo "${{ secrets.AVH_SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
-          chmod 600 ~/.ssh/id_rsa
-          chmod 644 ~/.ssh/id_rsa.pub
-          ssh-keyscan -H proxy.app.avh.corellium.com >> ~/.ssh/known_hosts
+          curl -L https://downloads.corellium.com/cli/linux/latest/corellium > /usr/local/bin/corellium
+          chmod +x /usr/local/bin/corellium
+      
+      - name: Configure Corellium
+        run: |
+          echo "${{ secrets.AVH_TOKEN }}" > ~/.avh_token
+          corellium login
       
       - name: Build
         run: |
@@ -38,18 +37,12 @@ jobs:
       
       - name: Deploy to AVH
         run: |
-          if [ -z "$AVH_USER" ]; then
-            echo "Error: AVH_USER is not set"
-            exit 1
-          fi
-          PROXY="${AVH_USER}@proxy.app.avh.corellium.com"
-          TARGET="pi@10.11.0.1"
+          echo "Creating AVH instance..."
+          INSTANCE_NAME="arm-iot-test"
+          corellium create-instance --name "$INSTANCE_NAME" --os corellium-linux-5.15 --type virt-arm-1 --wait
           
-          echo "Creating app directory..."
-          ssh -o StrictHostKeyChecking=no -J "$PROXY" "$TARGET" 'mkdir -p ~/app'
-          
-          echo "Copying binary..."
-          scp -o StrictHostKeyChecking=no -J "$PROXY" build/blink "$TARGET:~/app/"
+          echo "Uploading binary..."
+          corellium upload-file --instance "$INSTANCE_NAME" --source build/blink --destination /root/blink
           
           echo "Running application..."
-          ssh -o StrictHostKeyChecking=no -J "$PROXY" "$TARGET" 'chmod +x ~/app/blink && ~/app/blink'
+          corellium exec --instance "$INSTANCE_NAME" --command "chmod +x /root/blink && /root/blink"
