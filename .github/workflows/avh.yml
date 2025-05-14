@@ -26,8 +26,7 @@ jobs:
           
       - name: Build
         run: |
-          cmake -B build -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-avh.cmake
-          cmake --build build
+          make -f Makefile.arm
           
       - name: Deploy and Test on AVH
         run: |
