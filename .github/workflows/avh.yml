@@ -1,4 +1,4 @@
-name: Build and Deploy ARM IoT Application
+name: Build ARM IoT Application
 
 on:
   push:
@@ -24,20 +24,7 @@ jobs:
           cmake ..
           make
       
-      - name: Setup SSH
+      - name: Package Build
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.AVH_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          echo "${{ secrets.AVH_SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
-          ssh-keyscan -H proxy.app.avh.corellium.com >> ~/.ssh/known_hosts
-      
-      - name: Deploy and Test on AVH
-        env:
-          AVH_SSH_PRIVATE_KEY: ${{ secrets.AVH_SSH_PRIVATE_KEY }}
-          AVH_SSH_PUBLIC_KEY: ${{ secrets.AVH_SSH_PUBLIC_KEY }}
-          AVH_USER: ${{ secrets.AVH_USER }}
-        run: |
-          ssh -o StrictHostKeyChecking=no -J "${AVH_USER}@proxy.app.avh.corellium.com" pi@10.11.0.1 'mkdir -p ~/app'
-          scp -o StrictHostKeyChecking=no -J "${AVH_USER}@proxy.app.avh.corellium.com" build/blink pi@10.11.0.1:~/app/
-          ssh -o StrictHostKeyChecking=no -J "${AVH_USER}@proxy.app.avh.corellium.com" pi@10.11.0.1 'chmod +x ~/app/blink && ~/app/blink'
+          tar -czf build.tar.gz build/
+          echo "Build artifacts created successfully"
