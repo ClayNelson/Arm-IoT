@@ -36,22 +36,27 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           echo "${{ secrets.AVH_SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
           chmod 644 ~/.ssh/id_rsa.pub
-          ssh-keyscan -H proxy.app.avh.corellium.com >> ~/.ssh/known_hosts
-          echo "Host proxy.app.avh.corellium.com
-            User claynelson
-            IdentityFile ~/.ssh/id_rsa
+          echo "Host *
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
+            LogLevel DEBUG3
 
-          Host 10.11.0.1
-            ProxyJump proxy.app.avh.corellium.com
+          Host proxy
+            HostName proxy.app.avh.corellium.com
+            User claynelson
+            IdentityFile ~/.ssh/id_rsa
+            
+          Host target
+            HostName 10.11.0.1
             User pi
-            StrictHostKeyChecking no
-            UserKnownHostsFile=/dev/null" > ~/.ssh/config
+            ProxyJump proxy" > ~/.ssh/config
           chmod 600 ~/.ssh/config
+          
+          # Test proxy connection
+          ssh -v proxy 'echo "Proxy connection successful"'
       
       - name: Deploy to AVH
         run: |
-          ssh 10.11.0.1 'mkdir -p ~/app'
-          scp build/blink 10.11.0.1:~/app/
-          ssh 10.11.0.1 'chmod +x ~/app/blink && ~/app/blink'
+          ssh target 'mkdir -p ~/app'
+          scp build/blink target:~/app/
+          ssh target 'chmod +x ~/app/blink && ~/app/blink'
