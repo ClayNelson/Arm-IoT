@@ -7,8 +7,10 @@ on:
     branches: [ main ]
 
 jobs:
-  build-and-test:
+  build:
     runs-on: ubuntu-latest
+    env:
+      AVH_USER: ${{ secrets.AVH_USER }}
     steps:
       - uses: actions/checkout@v3
       
@@ -22,19 +24,32 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.AVH_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
           echo "${{ secrets.AVH_SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
-          
+          chmod 600 ~/.ssh/id_rsa
+          chmod 644 ~/.ssh/id_rsa.pub
+          ssh-keyscan -H proxy.app.avh.corellium.com >> ~/.ssh/known_hosts
+      
       - name: Build
         run: |
-          make -f Makefile.arm
-          
-      - name: Deploy and Test on AVH
+          mkdir -p build
+          cd build
+          cmake ..
+          make
+      
+      - name: Deploy to AVH
         run: |
-          ssh -o StrictHostKeyChecking=no -J ${{ secrets.AVH_USER }}@proxy.app.avh.corellium.com pi@10.11.0.1 'mkdir -p ~/app'
-          scp -o StrictHostKeyChecking=no -J ${{ secrets.AVH_USER }}@proxy.app.avh.corellium.com build/blink pi@10.11.0.1:~/app/
-          ssh -o StrictHostKeyChecking=no -J ${{ secrets.AVH_USER }}@proxy.app.avh.corellium.com pi@10.11.0.1 'chmod +x ~/app/blink && ~/app/blink'
-        env:
-          AVH_SSH_PRIVATE_KEY: ${{ secrets.AVH_SSH_PRIVATE_KEY }}
-          AVH_SSH_PUBLIC_KEY: ${{ secrets.AVH_SSH_PUBLIC_KEY }}
-          AVH_USER: ${{ secrets.AVH_USER }}
+          if [ -z "$AVH_USER" ]; then
+            echo "Error: AVH_USER is not set"
+            exit 1
+          fi
+          PROXY="${AVH_USER}@proxy.app.avh.corellium.com"
+          TARGET="pi@10.11.0.1"
+          
+          echo "Creating app directory..."
+          ssh -o StrictHostKeyChecking=no -J "$PROXY" "$TARGET" 'mkdir -p ~/app'
+          
+          echo "Copying binary..."
+          scp -o StrictHostKeyChecking=no -J "$PROXY" build/blink "$TARGET:~/app/"
+          
+          echo "Running application..."
+          ssh -o StrictHostKeyChecking=no -J "$PROXY" "$TARGET" 'chmod +x ~/app/blink && ~/app/blink'
