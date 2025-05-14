@@ -7,16 +7,37 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Source files
 set(SOURCES
+    src/startup.c
     src/main.c
+)
+
+# CPU-specific flags
+set(CPU_FLAGS
+    -mcpu=cortex-m55
+    -mthumb
+    -mfloat-abi=soft
+)
+
+# Compiler flags
+add_compile_options(
+    ${CPU_FLAGS}
+    --specs=nosys.specs
+    -ffunction-sections
+    -fdata-sections
+    -Wall
+    -g3
+)
+
+# Linker flags
+add_link_options(
+    ${CPU_FLAGS}
+    --specs=nosys.specs
+    -nostartfiles
+    -Wl,--gc-sections
 )
 
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES})
-
-# Include directories
-target_include_directories(${PROJECT_NAME} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
 
 # Set linker script
 set(LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/gcc_arm.ld)
