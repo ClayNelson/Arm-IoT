@@ -32,8 +32,14 @@ set(SOURCES
     src/startup.c
 )
 
+# Set linker script
+set(LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/gcc_arm.ld)
+
+# Create executable
+add_executable(${PROJECT_NAME} ${SOURCES})
+
 # Linker flags
-add_link_options(
+target_link_options(${PROJECT_NAME} PRIVATE
     ${CPU_FLAGS}
     -nostartfiles
     -nodefaultlibs
@@ -41,13 +47,8 @@ add_link_options(
     -Wl,--gc-sections
     -Wl,-N
     -Wl,-Map=${PROJECT_NAME}.map
-    -T${CMAKE_SOURCE_DIR}/gcc_arm.ld
+    -T${LINKER_SCRIPT}
 )
 
-# Create executable
-add_executable(${PROJECT_NAME} ${SOURCES})
-
-# Set linker script
-set(LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/gcc_arm.ld)
+# Set linker script dependency
 set_target_properties(${PROJECT_NAME} PROPERTIES LINK_DEPENDS ${LINKER_SCRIPT})
-target_link_options(${PROJECT_NAME} PRIVATE -T ${LINKER_SCRIPT})
