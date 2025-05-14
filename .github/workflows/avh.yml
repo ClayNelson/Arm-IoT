@@ -37,9 +37,14 @@ jobs:
           echo "${{ secrets.AVH_SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
           chmod 644 ~/.ssh/id_rsa.pub
           ssh-keyscan -H proxy.app.avh.corellium.com >> ~/.ssh/known_hosts
+          echo "Host 10.11.0.1
+            ProxyCommand ssh -W %h:%p proxy.app.avh.corellium.com
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null" > ~/.ssh/config
+          chmod 600 ~/.ssh/config
       
       - name: Deploy to AVH
         run: |
-          ssh -o StrictHostKeyChecking=no pi@10.11.0.1 'mkdir -p ~/app'
-          scp -o StrictHostKeyChecking=no build/blink pi@10.11.0.1:~/app/
-          ssh -o StrictHostKeyChecking=no pi@10.11.0.1 'chmod +x ~/app/blink && ~/app/blink'
+          ssh pi@10.11.0.1 'mkdir -p ~/app'
+          scp build/blink pi@10.11.0.1:~/app/
+          ssh pi@10.11.0.1 'chmod +x ~/app/blink && ~/app/blink'
