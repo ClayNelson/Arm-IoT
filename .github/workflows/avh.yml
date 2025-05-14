@@ -1,4 +1,4 @@
-name: Build ARM IoT Application
+name: Build and Deploy ARM IoT Application
 
 on:
   push:
@@ -28,3 +28,18 @@ jobs:
         run: |
           tar -czf build.tar.gz build/
           echo "Build artifacts created successfully"
+      
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AVH_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo "${{ secrets.AVH_SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
+          chmod 644 ~/.ssh/id_rsa.pub
+          ssh-keyscan -H proxy.app.avh.corellium.com >> ~/.ssh/known_hosts
+      
+      - name: Deploy to AVH
+        run: |
+          ssh -o StrictHostKeyChecking=no pi@10.11.0.1 'mkdir -p ~/app'
+          scp -o StrictHostKeyChecking=no build/blink pi@10.11.0.1:~/app/
+          ssh -o StrictHostKeyChecking=no pi@10.11.0.1 'chmod +x ~/app/blink && ~/app/blink'
