@@ -39,6 +39,9 @@ jobs:
             HostName proxy.app.avh.corellium.com
             User claynelson
             IdentityFile ~/.ssh/id_rsa
+            PubkeyAcceptedKeyTypes=+ssh-rsa
+            HostKeyAlgorithms=+ecdsa-sha2-nistp256
+            PubkeyAcceptedAlgorithms=+ssh-rsa
             StrictHostKeyChecking no" > ~/.ssh/config
           chmod 600 ~/.ssh/config
           
@@ -46,7 +49,7 @@ jobs:
           ssh-keygen -l -f ~/.ssh/id_rsa
           
           # Try connection with maximum verbosity
-          ssh -vvv proxy 'echo Connected'
+          ssh -vvv -o 'PubkeyAcceptedAlgorithms +ssh-rsa' proxy 'echo Connected'
       
       - name: Deploy to AVH
         run: |
