@@ -82,7 +82,8 @@ jobs:
           # Create SSH config with enhanced settings
           cat > ~/.ssh/config << 'EOF'
           Host proxy
-            HostName proxy.app.avh.corellium.com
+            HostName 172.16.0.50
+            Port 2003
             User 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981
             IdentityFile ~/.ssh/id_rsa
             PreferredAuthentications publickey
@@ -111,21 +112,38 @@ jobs:
         run: |
           echo "Deploying blink binary to AVH..."
           
-          # Try to establish SSH connection first
+          echo "Current directory contents:"
+          ls -la build/
+          
+          echo "Network configuration:"
+          netstat -nr
+          
+          echo "DNS resolution:"
+          nslookup 172.16.0.50 || true
+          
+          echo "Testing proxy connectivity:"
+          nc -zv 172.16.0.50 2003 || true
+          
+          echo "SSH debug information:"
+          ssh -vvv proxy echo "SSH connection test" || true
+          
+          echo "SSH key information:"
+          ssh-keygen -l -f ~/.ssh/id_rsa
+          
+          echo "SSH config:"
+          cat ~/.ssh/config
+          
+          # Try to establish SSH connection
           echo "Testing SSH connection..."
           if ! ssh -v proxy echo "SSH connection successful!"; then
-            echo "Failed to connect to proxy server. Checking SSH configuration:"
-            cat ~/.ssh/config
-            echo "Checking SSH key:"
-            ssh-keygen -l -f ~/.ssh/id_rsa
+            echo "Failed to connect to proxy server."
             exit 1
           fi
           
           # Attempt deployment
           echo "Copying binary to target..."
           if ! scp -v build/blink target:~/; then
-            echo "Failed to copy binary. Network configuration:"
-            netstat -nr
+            echo "Failed to copy binary."
             exit 1
           fi
           
