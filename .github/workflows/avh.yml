@@ -45,7 +45,7 @@ jobs:
             IdentityFile ~/.ssh/id_rsa
             PubkeyAuthentication yes
             PreferredAuthentications publickey
-            PubkeyAcceptedKeyTypes rsa-sha2-512,rsa-sha2-256
+            PubkeyAcceptedKeyTypes rsa-sha2-512,rsa-sha2-256,ssh-rsa
             HostKeyAlgorithms ecdsa-sha2-nistp256
             ServerAliveInterval 30
             StrictHostKeyChecking no
