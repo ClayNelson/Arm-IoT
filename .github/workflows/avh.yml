@@ -67,44 +67,70 @@ jobs:
 
       - name: Configure SSH
         run: |
+          # Create SSH directory and set permissions
           mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          
+          # Write private key and set permissions
           echo "${{ secrets.AVH_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           
-          # Generate public key with modern format
+          # Generate public key
           ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub
           chmod 644 ~/.ssh/id_rsa.pub
           
+          # Create SSH config with enhanced settings
           cat > ~/.ssh/config << 'EOF'
           Host proxy
             HostName proxy.app.avh.corellium.com
             User 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981
             IdentityFile ~/.ssh/id_rsa
             PreferredAuthentications publickey
-            PubkeyAcceptedKeyTypes rsa-sha2-512,rsa-sha2-256,ssh-rsa
-            HostKeyAlgorithms ecdsa-sha2-nistp256
+            PubkeyAcceptedKeyTypes +ssh-rsa
+            HostKeyAlgorithms +ssh-rsa
+            KexAlgorithms +diffie-hellman-group14-sha1
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
+            LogLevel DEBUG3
 
           Host target
             HostName 10.11.0.1
             User pi
-            ProxyCommand ssh proxy -W %h:%p
+            ProxyCommand ssh -v proxy -W %h:%p
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
+            LogLevel DEBUG3
           EOF
           chmod 600 ~/.ssh/config
+          
+          # Test SSH connection with debugging
+          echo "Testing SSH connection to proxy..."
+          ssh -v proxy echo "SSH connection successful!" || echo "SSH connection failed"
 
       - name: Deploy to AVH
         run: |
-          echo "Creating app directory..."
-          sshpass -p 'raspberry' ssh target 'mkdir -p ~/app'
+          echo "Deploying blink binary to AVH..."
           
-          echo "Copying binary..."
-          sshpass -p 'raspberry' scp -F ~/.ssh/config build/blink target:~/app/
+          # Try to establish SSH connection first
+          echo "Testing SSH connection..."
+          if ! ssh -v proxy echo "SSH connection successful!"; then
+            echo "Failed to connect to proxy server. Checking SSH configuration:"
+            cat ~/.ssh/config
+            echo "Checking SSH key:"
+            ssh-keygen -l -f ~/.ssh/id_rsa
+            exit 1
+          fi
           
-          echo "Setting permissions..."
-          sshpass -p 'raspberry' ssh target 'sudo chown root:root ~/app/blink && sudo chmod +s ~/app/blink'
+          # Attempt deployment
+          echo "Copying binary to target..."
+          if ! scp -v build/blink target:~/; then
+            echo "Failed to copy binary. Network configuration:"
+            netstat -nr
+            exit 1
+          fi
           
-          echo "Starting blink program..."
-          sshpass -p 'raspberry' ssh target '~/app/blink'
+          echo "Setting permissions and running binary..."
+          if ! ssh -v target "chmod +x ~/blink && ~/blink"; then
+            echo "Failed to execute binary on target."
+            exit 1
+          fi
