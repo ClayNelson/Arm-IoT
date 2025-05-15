@@ -19,10 +19,30 @@ jobs:
       
       - name: Build
         run: |
+          echo "Current directory: $(pwd)"
+          echo "Listing repository contents:"
+          ls -la
+          
+          echo "\nCreating build directory..."
           mkdir -p build
           cd build
-          cmake ..
-          make
+          
+          echo "\nRunning CMake..."
+          cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          
+          echo "\nRunning Make..."
+          make VERBOSE=1
+          
+          echo "\nChecking build output:"
+          ls -la
+          
+          if [ ! -f blink ]; then
+            echo "Error: Build step did not produce the 'blink' binary."
+            exit 1
+          fi
+          
+          echo "\nBuild successful! Binary details:"
+          file blink
       
       - name: Package Build
         run: |
@@ -74,10 +94,22 @@ jobs:
           fi
           
           echo "Creating app directory..."
-          sshpass -p 'raspberry' ssh target 'mkdir -p ~/app'
+          sshpass -p 'raspberry' ssh -v target 'mkdir -p ~/app'
+          
+          echo "\nVerifying directory creation..."
+          sshpass -p 'raspberry' ssh -v target 'ls -la ~/app'
           
           echo "\nCopying binary..."
-          sshpass -p 'raspberry' scp -F ~/.ssh/config build/blink target:~/app/
+          sshpass -p 'raspberry' scp -v -F ~/.ssh/config build/blink target:~/app/
+          
+          echo "\nVerifying file copy..."
+          sshpass -p 'raspberry' ssh -v target 'ls -la ~/app/blink'
+          
+          echo "\nSetting permissions..."
+          sshpass -p 'raspberry' ssh -v target 'chmod +x ~/app/blink'
+          
+          echo "\nVerifying permissions..."
+          sshpass -p 'raspberry' ssh -v target 'ls -la ~/app/blink'
           
           echo "\nExecuting binary..."
-          sshpass -p 'raspberry' ssh target 'chmod +x ~/app/blink && ~/app/blink'
+          sshpass -p 'raspberry' ssh -v target '~/app/blink'
