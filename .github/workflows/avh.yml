@@ -41,7 +41,7 @@ jobs:
           
           echo "Host proxy
             HostName proxy.app.avh.corellium.com
-            User claynelson
+            User 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981
             IdentityFile ~/.ssh/id_rsa
             PubkeyAuthentication yes
             PreferredAuthentications publickey
@@ -55,13 +55,13 @@ jobs:
           echo "Key details:"
           ssh-keygen -l -f ~/.ssh/id_rsa
           
-          # Try connection with modern algorithms
-          ssh -vvv proxy 'echo Connected'
+          # Try connection with jump host
+          ssh -J proxy pi@10.11.0.1 'echo Connected'
           
-          # If that fails, try with ssh-rsa
+          # If that fails, try with explicit key type
           if [ $? -ne 0 ]; then
-            echo "\nRetrying with ssh-rsa..."
-            ssh -vvv -o 'PubkeyAcceptedKeyTypes +ssh-rsa' proxy 'echo Connected'
+            echo "\nRetrying with explicit key type..."
+            ssh -J proxy -o 'PubkeyAcceptedKeyTypes +ssh-rsa' pi@10.11.0.1 'echo Connected'
           fi
       
       - name: Deploy to AVH
