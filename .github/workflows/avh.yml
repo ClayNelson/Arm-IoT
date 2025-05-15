@@ -16,7 +16,8 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake make gcc sshpass
+          sudo apt-get install -y cmake make gcc sshpass \
+            gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
 
       - name: Build
         run: |
@@ -24,16 +25,20 @@ jobs:
           mkdir -p build
           cd build
           
-          echo "Running CMake..."
-          cmake -DCMAKE_BUILD_TYPE=Release ..
+          echo "Running CMake with ARM toolchain..."
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_TOOLCHAIN_FILE=../toolchains/arm-toolchain.cmake ..
           
           echo "Running Make..."
-          make
+          make VERBOSE=1
           
           if [ ! -f blink ]; then
             echo "Error: Build step did not produce the 'blink' binary."
             exit 1
           fi
+          
+          echo "Checking binary type:"
+          file blink
 
       - name: Configure SSH
         run: |
