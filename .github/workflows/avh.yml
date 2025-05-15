@@ -30,10 +30,13 @@ jobs:
           deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ jammy-security main restricted universe multiverse
           EOF
           
-          # Update and install
+          # Update and install dependencies
           sudo apt-get update
           sudo apt-get install -y cmake make gcc sshpass
-          sudo apt-get install -y crossbuild-essential-armhf
+          sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+          
+          # Verify toolchain installation
+          arm-linux-gnueabihf-gcc --version
 
       - name: Build
         run: |
@@ -42,8 +45,14 @@ jobs:
           cd build
           
           echo "Running CMake with ARM toolchain..."
+          CFLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
+          CXXFLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
+          LDFLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
           cmake -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_TOOLCHAIN_FILE=../toolchains/arm-toolchain.cmake ..
+                -DCMAKE_TOOLCHAIN_FILE=../toolchains/arm-toolchain.cmake \
+                -DCMAKE_C_FLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
+                -DCMAKE_CXX_FLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
+                -DCMAKE_EXE_LINKER_FLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" ..
           
           echo "Running Make..."
           make VERBOSE=1
