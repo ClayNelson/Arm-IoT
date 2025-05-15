@@ -44,6 +44,13 @@ jobs:
           mkdir -p build
           cd build
           
+          echo "Checking toolchain file..."
+          if [ ! -f ../toolchains/arm-toolchain.cmake ]; then
+            echo "Error: Toolchain file not found"
+            exit 1
+          fi
+          cat ../toolchains/arm-toolchain.cmake
+          
           echo "Running CMake with ARM toolchain..."
           CFLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
           CXXFLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
@@ -54,16 +61,25 @@ jobs:
                 -DCMAKE_CXX_FLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
                 -DCMAKE_EXE_LINKER_FLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" ..
           
+          echo "CMake cache contents:"
+          cat CMakeCache.txt
+          
           echo "Running Make..."
           make VERBOSE=1
           
+          echo "Build directory contents:"
+          ls -la
+          
           if [ ! -f blink ]; then
             echo "Error: Build step did not produce the 'blink' binary."
+            echo "Checking CMake error log:"
+            cat CMakeFiles/CMakeError.log || true
             exit 1
           fi
           
           echo "Checking binary type:"
           file blink
+          readelf -h blink || true
 
       - name: Configure SSH
         run: |
@@ -115,31 +131,48 @@ jobs:
         run: |
           echo "Deploying blink binary to AVH..."
           
-          echo "Current directory contents:"
+          echo "Build directory contents:"
           ls -la build/
           
           echo "Network configuration:"
           netstat -nr
+          ip route || true
           
           echo "DNS resolution:"
+          dig +short proxy.app.avh.corellium.com || true
           nslookup proxy.app.avh.corellium.com || true
           
           echo "Testing proxy connectivity:"
-          nc -zv proxy.app.avh.corellium.com 22 || true
+          for port in 22 2003 2222; do
+            echo "Testing port $port..."
+            nc -zv proxy.app.avh.corellium.com $port || true
+          done
           
           echo "SSH debug information:"
           ssh -vvv proxy echo "SSH connection test" || true
           
           echo "SSH key information:"
           ssh-keygen -l -f ~/.ssh/id_rsa
+          echo "Public key contents:"
+          cat ~/.ssh/id_rsa.pub
           
           echo "SSH config:"
           cat ~/.ssh/config
           
-          # Try to establish SSH connection
-          echo "Testing SSH connection..."
-          if ! ssh -v proxy echo "SSH connection successful!"; then
-            echo "Failed to connect to proxy server."
+          # Try direct connection to proxy first
+          echo "Testing direct SSH connection to proxy..."
+          if ! ssh -v -p 2003 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com echo "Direct SSH connection successful!"; then
+            echo "Direct connection failed, trying configured proxy..."
+            if ! ssh -v proxy echo "SSH connection successful!"; then
+              echo "Failed to connect to proxy server."
+              exit 1
+            fi
+          fi
+          
+          # Test target connectivity
+          echo "Testing target connectivity..."
+          if ! ssh -v target echo "Target reachable"; then
+            echo "Failed to connect to target device."
             exit 1
           fi
           
