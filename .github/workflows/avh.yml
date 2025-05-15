@@ -77,7 +77,7 @@ jobs:
           sshpass -p 'raspberry' ssh target 'mkdir -p ~/app'
           
           echo "\nCopying binary..."
-          sshpass -p 'raspberry' scp -o 'ProxyCommand ssh proxy -W %h:%p' build/blink pi@10.11.0.1:~/app/
+          sshpass -p 'raspberry' scp -F ~/.ssh/config build/blink target:~/app/
           
           echo "\nExecuting binary..."
           sshpass -p 'raspberry' ssh target 'chmod +x ~/app/blink && ~/app/blink'
