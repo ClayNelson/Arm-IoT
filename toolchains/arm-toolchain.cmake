@@ -16,4 +16,5 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 
 # Flags for Raspberry Pi
-add_compile_options(-march=armv8-a)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv8-a -mfloat-abi=softfp -mfpu=neon-fp-armv8")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8-a -mfloat-abi=softfp -mfpu=neon-fp-armv8")

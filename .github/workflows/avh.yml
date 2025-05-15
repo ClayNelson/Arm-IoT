@@ -15,9 +15,11 @@ jobs:
 
       - name: Install Dependencies
         run: |
+          sudo dpkg --add-architecture armhf
           sudo apt-get update
           sudo apt-get install -y cmake make gcc sshpass \
-            gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+            gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
+            libc6-dev-armhf-cross linux-libc-dev-armhf-cross
 
       - name: Build
         run: |
