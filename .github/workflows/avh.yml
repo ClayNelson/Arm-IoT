@@ -97,24 +97,6 @@ jobs:
           
           # Create SSH config with enhanced settings
           cat > ~/.ssh/config << 'EOF'
-          Host proxy-tunnel
-            HostName proxy.app.avh.corellium.com
-            Port 22
-            User 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981
-            IdentityFile ~/.ssh/id_rsa
-            PreferredAuthentications publickey
-            PubkeyAcceptedKeyTypes +ssh-rsa
-            HostKeyAlgorithms +ssh-rsa
-            KexAlgorithms +diffie-hellman-group14-sha1
-            StrictHostKeyChecking no
-            UserKnownHostsFile=/dev/null
-            LogLevel DEBUG3
-            ServerAliveInterval 30
-            ServerAliveCountMax 3
-            DynamicForward 1080
-            ExitOnForwardFailure yes
-            ConnectTimeout 30
-
           Host proxy
             HostName proxy.app.avh.corellium.com
             Port 22
@@ -130,11 +112,13 @@ jobs:
             ServerAliveInterval 30
             ServerAliveCountMax 3
             ConnectTimeout 30
+            LocalForward 2222 10.11.0.1:22
 
           Host target
-            HostName 10.11.0.1
+            HostName localhost
+            Port 2222
             User pi
-            ProxyCommand nc -x localhost:1080 %h %p
+            IdentityFile ~/.ssh/id_rsa
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
             LogLevel DEBUG3
@@ -180,16 +164,16 @@ jobs:
           echo "SSH config:"
           cat ~/.ssh/config
           
-          # Set up SOCKS proxy tunnel
-          echo "Setting up SOCKS proxy tunnel..."
-          ssh -f -N proxy-tunnel
+          # Set up port forwarding tunnel
+          echo "Setting up port forwarding tunnel..."
+          ssh -f -N proxy
           sleep 5
           
-          # Try connection through SOCKS proxy
-          echo "Testing proxy connection through SOCKS..."
-          if ! ssh -v proxy echo "SSH connection successful!"; then
-            echo "Failed to connect through proxy. Trying direct connection..."
-            if ! ssh -v -p 22 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com echo "Direct SSH connection successful!"; then
+          # Test connection through tunnel
+          echo "Testing connection through tunnel..."
+          if ! ssh -v target echo "SSH connection successful!"; then
+            echo "Failed to connect through tunnel. Trying direct connection..."
+            if ! ssh -v proxy echo "Direct SSH connection successful!"; then
               echo "All connection attempts failed."
               exit 1
             fi
