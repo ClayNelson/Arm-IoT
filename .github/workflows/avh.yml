@@ -32,38 +32,20 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          # Generate a new SSH key pair
-          ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
+          echo "${{ secrets.AVH_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
           
-          # Show the public key - you'll need to add this to your avh.yml
-          echo "New public key to add to avh.yml:"
-          cat ~/.ssh/id_rsa.pub
-          
-          # Configure SSH
-          echo "Host *
+          echo "Host proxy.app.avh.corellium.com
+            User claynelson
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
-            LogLevel DEBUG3
-
-          Host proxy
-            HostName proxy.app.avh.corellium.com
-            User claynelson
-            IdentityFile ~/.ssh/id_rsa
-            
-          Host target
-            HostName 10.11.0.1
-            User pi
-            ProxyJump proxy" > ~/.ssh/config
+            IdentityFile ~/.ssh/id_rsa" > ~/.ssh/config
           chmod 600 ~/.ssh/config
           
-          # Show key fingerprint
-          ssh-keygen -l -f ~/.ssh/id_rsa.pub
-          
-          # Test proxy connection
-          ssh -v proxy 'echo "Proxy connection successful"'
+          ssh -v proxy.app.avh.corellium.com 'echo "Proxy connection successful"'
       
       - name: Deploy to AVH
         run: |
-          ssh target 'mkdir -p ~/app'
-          scp build/blink target:~/app/
-          ssh target 'chmod +x ~/app/blink && ~/app/blink'
+          ssh -J proxy.app.avh.corellium.com pi@10.11.0.1 'mkdir -p ~/app'
+          scp -o ProxyJump=proxy.app.avh.corellium.com build/blink pi@10.11.0.1:~/app/
+          ssh -J proxy.app.avh.corellium.com pi@10.11.0.1 'chmod +x ~/app/blink && ~/app/blink'
