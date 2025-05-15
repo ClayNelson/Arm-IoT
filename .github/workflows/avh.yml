@@ -18,18 +18,22 @@ jobs:
           # Add ARM architecture
           sudo dpkg --add-architecture armhf
           
-          # Add ports repository
-          sudo tee /etc/apt/sources.list.d/arm-ports.list > /dev/null << 'EOF'
-          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy main restricted
-          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted
-          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted
+          # Backup and create new sources.list
+          sudo mv /etc/apt/sources.list /etc/apt/sources.list.bak
+          sudo tee /etc/apt/sources.list > /dev/null << 'EOF'
+          deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse
+          deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe multiverse
+          deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-security main restricted universe multiverse
+          
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ jammy main restricted universe multiverse
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ jammy-updates main restricted universe multiverse
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ jammy-security main restricted universe multiverse
           EOF
           
           # Update and install
           sudo apt-get update
-          sudo apt-get install -y cmake make gcc sshpass \
-            gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
-            libc6-dev-armhf-cross linux-libc-dev-armhf-cross
+          sudo apt-get install -y cmake make gcc sshpass
+          sudo apt-get install -y crossbuild-essential-armhf
 
       - name: Build
         run: |
