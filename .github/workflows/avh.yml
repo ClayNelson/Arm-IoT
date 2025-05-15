@@ -15,9 +15,17 @@ jobs:
 
       - name: Install Dependencies
         run: |
+          # Add ARM architecture
           sudo dpkg --add-architecture armhf
-          # Update repository URLs to jammy
-          sudo sed -i 's/noble/jammy/g' /etc/apt/sources.list
+          
+          # Add ports repository
+          sudo tee /etc/apt/sources.list.d/arm-ports.list > /dev/null << 'EOF'
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy main restricted
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted
+          EOF
+          
+          # Update and install
           sudo apt-get update
           sudo apt-get install -y cmake make gcc sshpass \
             gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
