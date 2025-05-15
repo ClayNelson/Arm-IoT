@@ -55,17 +55,27 @@ jobs:
           echo "Key details:"
           ssh-keygen -l -f ~/.ssh/id_rsa
           
-          # Try connection with jump host
-          sshpass -p 'raspberry' ssh -o StrictHostKeyChecking=no -J proxy pi@10.11.0.1 'echo Connected'
-          
-          # If that fails, try with explicit key type
-          if [ $? -ne 0 ]; then
-            echo "\nRetrying with explicit key type..."
-            sshpass -p 'raspberry' ssh -o StrictHostKeyChecking=no -J proxy -o 'PubkeyAcceptedKeyTypes +ssh-rsa' pi@10.11.0.1 'echo Connected'
-          fi
+          # Configure SSH for both proxy and final connection
+          cat > ~/.ssh/config << EOF
+          Host proxy
+            HostName proxy.app.avh.corellium.com
+            User 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no
+
+          Host target
+            HostName 10.11.0.1
+            User pi
+            ProxyJump proxy
+            StrictHostKeyChecking no
+            PreferredAuthentications password
+          EOF
+
+          # Try connection
+          sshpass -p 'raspberry' ssh target 'echo Connected'
       
       - name: Deploy to AVH
         run: |
-          sshpass -p 'raspberry' ssh -o StrictHostKeyChecking=no -J proxy pi@10.11.0.1 'mkdir -p ~/app'
-          sshpass -p 'raspberry' scp -o StrictHostKeyChecking=no -o ProxyJump=proxy build/blink pi@10.11.0.1:~/app/
-          sshpass -p 'raspberry' ssh -o StrictHostKeyChecking=no -J proxy pi@10.11.0.1 'chmod +x ~/app/blink && ~/app/blink'
+          sshpass -p 'raspberry' ssh target 'mkdir -p ~/app'
+          sshpass -p 'raspberry' scp -o ProxyJump=proxy build/blink target:~/app/
+          sshpass -p 'raspberry' ssh target 'chmod +x ~/app/blink && ~/app/blink'
