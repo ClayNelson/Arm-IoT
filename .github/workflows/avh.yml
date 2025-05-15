@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v2
@@ -16,6 +16,8 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo dpkg --add-architecture armhf
+          # Update repository URLs to jammy
+          sudo sed -i 's/noble/jammy/g' /etc/apt/sources.list
           sudo apt-get update
           sudo apt-get install -y cmake make gcc sshpass \
             gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
