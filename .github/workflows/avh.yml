@@ -11,10 +11,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Install ARM toolchain
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-arm-none-eabi
+          sudo apt-get install -y gcc-arm-none-eabi sshpass
           arm-none-eabi-gcc --version
       
       - name: Build
@@ -56,16 +56,16 @@ jobs:
           ssh-keygen -l -f ~/.ssh/id_rsa
           
           # Try connection with jump host
-          ssh -J proxy pi@10.11.0.1 'echo Connected'
+          sshpass -p 'raspberry' ssh -o StrictHostKeyChecking=no -J proxy pi@10.11.0.1 'echo Connected'
           
           # If that fails, try with explicit key type
           if [ $? -ne 0 ]; then
             echo "\nRetrying with explicit key type..."
-            ssh -J proxy -o 'PubkeyAcceptedKeyTypes +ssh-rsa' pi@10.11.0.1 'echo Connected'
+            sshpass -p 'raspberry' ssh -o StrictHostKeyChecking=no -J proxy -o 'PubkeyAcceptedKeyTypes +ssh-rsa' pi@10.11.0.1 'echo Connected'
           fi
       
       - name: Deploy to AVH
         run: |
-          ssh -J proxy pi@10.11.0.1 'mkdir -p ~/app'
-          scp -o ProxyJump=proxy build/blink pi@10.11.0.1:~/app/
-          ssh -J proxy pi@10.11.0.1 'chmod +x ~/app/blink && ~/app/blink'
+          sshpass -p 'raspberry' ssh -o StrictHostKeyChecking=no -J proxy pi@10.11.0.1 'mkdir -p ~/app'
+          sshpass -p 'raspberry' scp -o StrictHostKeyChecking=no -o ProxyJump=proxy build/blink pi@10.11.0.1:~/app/
+          sshpass -p 'raspberry' ssh -o StrictHostKeyChecking=no -J proxy pi@10.11.0.1 'chmod +x ~/app/blink && ~/app/blink'
