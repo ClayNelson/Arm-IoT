@@ -82,8 +82,7 @@ jobs:
           # Create SSH config with enhanced settings
           cat > ~/.ssh/config << 'EOF'
           Host proxy
-            HostName 172.16.0.50
-            Port 2003
+            HostName proxy.app.avh.corellium.com
             User 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981
             IdentityFile ~/.ssh/id_rsa
             PreferredAuthentications publickey
@@ -93,6 +92,8 @@ jobs:
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
             LogLevel DEBUG3
+            ServerAliveInterval 30
+            ServerAliveCountMax 3
 
           Host target
             HostName 10.11.0.1
@@ -101,6 +102,8 @@ jobs:
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
             LogLevel DEBUG3
+            ServerAliveInterval 30
+            ServerAliveCountMax 3
           EOF
           chmod 600 ~/.ssh/config
           
@@ -119,10 +122,10 @@ jobs:
           netstat -nr
           
           echo "DNS resolution:"
-          nslookup 172.16.0.50 || true
+          nslookup proxy.app.avh.corellium.com || true
           
           echo "Testing proxy connectivity:"
-          nc -zv 172.16.0.50 2003 || true
+          nc -zv proxy.app.avh.corellium.com 22 || true
           
           echo "SSH debug information:"
           ssh -vvv proxy echo "SSH connection test" || true
