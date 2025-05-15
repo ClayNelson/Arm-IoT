@@ -1,66 +1,43 @@
-name: Build and Deploy ARM IoT Application
+name: Build and Deploy
 
 on:
   push:
+    branches: [ main ]
+  pull_request:
     branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Install dependencies
+      - uses: actions/checkout@v2
+
+      - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-arm-none-eabi sshpass
-          arm-none-eabi-gcc --version
-      
+          sudo apt-get install -y cmake make gcc sshpass
+
       - name: Build
         run: |
-          echo "Current directory: $(pwd)"
-          echo "Listing repository contents:"
-          ls -la
-          
-          echo "\nCreating build directory..."
+          echo "Creating build directory..."
           mkdir -p build
           cd build
           
-          echo "\nRunning CMake..."
-          cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          echo "Running CMake..."
+          cmake -DCMAKE_BUILD_TYPE=Release ..
           
-          echo "\nRunning Make..."
-          make VERBOSE=1
-          
-          echo "\nChecking build output:"
-          ls -la
+          echo "Running Make..."
+          make
           
           if [ ! -f blink ]; then
             echo "Error: Build step did not produce the 'blink' binary."
             exit 1
           fi
-          
-          echo "\nBuild successful! Binary details:"
-          file blink
-      
-      - name: Package Build
-        run: |
-          tar -czf build.tar.gz build/
-          echo "Build artifacts created successfully"
-      
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.AVH_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          
-          # Generate public key with modern format
-          ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub
-          chmod 644 ~/.ssh/id_rsa.pub
-          
+
       - name: Configure SSH
         run: |
+          mkdir -p ~/.ssh
           cat > ~/.ssh/config << 'EOF'
           Host proxy
             HostName proxy.app.avh.corellium.com
@@ -81,35 +58,21 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
           
-          # Test connection
-          echo "\nTesting connection to target..."
-          sshpass -p 'raspberry' ssh -v target 'echo Connected to target'
-      
+          # Generate SSH key
+          ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
+          chmod 600 ~/.ssh/id_rsa
+          chmod 644 ~/.ssh/id_rsa.pub
+
       - name: Deploy to AVH
         run: |
-          # Verify build artifact exists
-          if [ ! -f build/blink ]; then
-            echo "Error: build/blink does not exist"
-            exit 1
-          fi
-          
           echo "Creating app directory..."
-          sshpass -p 'raspberry' ssh -v target 'mkdir -p ~/app'
+          sshpass -p 'raspberry' ssh target 'mkdir -p ~/app'
           
-          echo "\nVerifying directory creation..."
-          sshpass -p 'raspberry' ssh -v target 'ls -la ~/app'
+          echo "Copying binary..."
+          sshpass -p 'raspberry' scp -F ~/.ssh/config build/blink target:~/app/
           
-          echo "\nCopying binary..."
-          sshpass -p 'raspberry' scp -v -F ~/.ssh/config build/blink target:~/app/
+          echo "Setting permissions..."
+          sshpass -p 'raspberry' ssh target 'sudo chown root:root ~/app/blink && sudo chmod +s ~/app/blink'
           
-          echo "\nVerifying file copy..."
-          sshpass -p 'raspberry' ssh -v target 'ls -la ~/app/blink'
-          
-          echo "\nSetting permissions..."
-          sshpass -p 'raspberry' ssh -v target 'chmod +x ~/app/blink'
-          
-          echo "\nVerifying permissions..."
-          sshpass -p 'raspberry' ssh -v target 'ls -la ~/app/blink'
-          
-          echo "\nExecuting binary..."
-          sshpass -p 'raspberry' ssh -v target '~/app/blink'
+          echo "Starting blink program..."
+          sshpass -p 'raspberry' ssh target '~/app/blink'
