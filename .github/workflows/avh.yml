@@ -97,6 +97,24 @@ jobs:
           
           # Create SSH config with enhanced settings
           cat > ~/.ssh/config << 'EOF'
+          Host proxy-tunnel
+            HostName proxy.app.avh.corellium.com
+            Port 22
+            User 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981
+            IdentityFile ~/.ssh/id_rsa
+            PreferredAuthentications publickey
+            PubkeyAcceptedKeyTypes +ssh-rsa
+            HostKeyAlgorithms +ssh-rsa
+            KexAlgorithms +diffie-hellman-group14-sha1
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            LogLevel DEBUG3
+            ServerAliveInterval 30
+            ServerAliveCountMax 3
+            DynamicForward 1080
+            ExitOnForwardFailure yes
+            ConnectTimeout 30
+
           Host proxy
             HostName proxy.app.avh.corellium.com
             Port 22
@@ -111,16 +129,18 @@ jobs:
             LogLevel DEBUG3
             ServerAliveInterval 30
             ServerAliveCountMax 3
+            ConnectTimeout 30
 
           Host target
             HostName 10.11.0.1
             User pi
-            ProxyCommand ssh -v proxy -W %h:%p
+            ProxyCommand nc -x localhost:1080 %h %p
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
             LogLevel DEBUG3
             ServerAliveInterval 30
             ServerAliveCountMax 3
+            ConnectTimeout 30
           EOF
           chmod 600 ~/.ssh/config
           
@@ -160,12 +180,17 @@ jobs:
           echo "SSH config:"
           cat ~/.ssh/config
           
-          # Try direct connection to proxy first
-          echo "Testing direct SSH connection to proxy..."
-          if ! ssh -v -p 22 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com echo "Direct SSH connection successful!"; then
-            echo "Direct connection failed, trying configured proxy..."
-            if ! ssh -v proxy echo "SSH connection successful!"; then
-              echo "Failed to connect to proxy server."
+          # Set up SOCKS proxy tunnel
+          echo "Setting up SOCKS proxy tunnel..."
+          ssh -f -N proxy-tunnel
+          sleep 5
+          
+          # Try connection through SOCKS proxy
+          echo "Testing proxy connection through SOCKS..."
+          if ! ssh -v proxy echo "SSH connection successful!"; then
+            echo "Failed to connect through proxy. Trying direct connection..."
+            if ! ssh -v -p 22 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com echo "Direct SSH connection successful!"; then
+              echo "All connection attempts failed."
               exit 1
             fi
           fi
