@@ -35,8 +35,8 @@ jobs:
           echo "${{ secrets.AVH_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           
-          # Generate public key with explicit ssh-rsa format
-          ssh-keygen -y -f ~/.ssh/id_rsa -t ssh-rsa > ~/.ssh/id_rsa.pub
+          # Generate public key with newer algorithms and no comment
+          ssh-keygen -y -f ~/.ssh/id_rsa | cut -d' ' -f1-2 > ~/.ssh/id_rsa.pub
           chmod 644 ~/.ssh/id_rsa.pub
           
           echo "Host proxy
@@ -45,8 +45,9 @@ jobs:
             IdentityFile ~/.ssh/id_rsa
             PubkeyAuthentication yes
             PreferredAuthentications publickey
-            PubkeyAcceptedKeyTypes=+ssh-rsa,rsa-sha2-256,rsa-sha2-512
-            HostKeyAlgorithms=+ecdsa-sha2-nistp256
+            PubkeyAcceptedKeyTypes rsa-sha2-512,rsa-sha2-256,ssh-rsa
+            HostKeyAlgorithms ecdsa-sha2-nistp256
+            ServerAliveInterval 30
             StrictHostKeyChecking no" > ~/.ssh/config
           chmod 600 ~/.ssh/config
           
@@ -57,8 +58,8 @@ jobs:
           echo "\nPublic key contents:"
           cat ~/.ssh/id_rsa.pub
           
-          # Try connection with maximum verbosity
-          ssh -vvv proxy 'echo Connected'
+          # Try connection with maximum verbosity and explicit key type
+          ssh -vvv -o 'IdentityFile ~/.ssh/id_rsa' -o 'PubkeyAcceptedKeyTypes rsa-sha2-512,rsa-sha2-256,ssh-rsa' proxy 'echo Connected'
       
       - name: Deploy to AVH
         run: |
