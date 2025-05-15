@@ -99,6 +99,7 @@ jobs:
           cat > ~/.ssh/config << 'EOF'
           Host proxy
             HostName proxy.app.avh.corellium.com
+            Port 22
             User 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981
             IdentityFile ~/.ssh/id_rsa
             PreferredAuthentications publickey
@@ -161,7 +162,7 @@ jobs:
           
           # Try direct connection to proxy first
           echo "Testing direct SSH connection to proxy..."
-          if ! ssh -v -p 2003 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com echo "Direct SSH connection successful!"; then
+          if ! ssh -v -p 22 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com echo "Direct SSH connection successful!"; then
             echo "Direct connection failed, trying configured proxy..."
             if ! ssh -v proxy echo "SSH connection successful!"; then
               echo "Failed to connect to proxy server."
