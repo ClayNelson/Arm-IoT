@@ -32,39 +32,24 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          # Write private key
           echo "${{ secrets.AVH_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           
-          # Generate public key from private key and set correct username
-          ssh-keygen -y -f ~/.ssh/id_rsa | sed 's/\$/./' > ~/.ssh/id_rsa.pub
-          echo -n " claynelson@corellium.com" >> ~/.ssh/id_rsa.pub
-          chmod 644 ~/.ssh/id_rsa.pub
-          
-          echo "Generated public key:"
-          cat ~/.ssh/id_rsa.pub
-          
-          echo "\nExpected public key from avh.yml:"
-          echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCzXCQc2nBGJ+aRw5/7QNlv+IvNCi4PR56V+TfyVctBcitex5iHOdCsOWlMOwPkOqornQJXD7ls6SjBmRclu2Kq43kWofP8i+H4fzGp7vtXlKYMAYs7JPQjp/03VmsBq1WN0G3IcG0if+FbivXGP3+DW/jSWqlkZS6b590naamqA8NiQhaSaBRx/pDNp+VB1OZEYt1TIIdzMUo8MMYKx94PVVA/k+iKcb0fYP7I9DoaFS42iANg1O6boahzv0P729pYJqXzERrVPxh+x5GWK/ZIqnseXrVSudiFUADBvtqeDbsx2Ld2yKFDOLMoXG4dBtplX0HDJmM0p/5+gl2DS1n3a+rl1mrsbLXytAxzzaRBUI+QiNG/1L8pBdk8ZXI3ziuKOXj09Bw6RuZWIlvz0Ex7UeZEoYN4RxOeDYGxLOyqNQX1xQ4yVSE0e+lze4Q7e0PL+fe2GOxdmugQlZYsQ2U4ZdO19n1+kbuGgo8ggfYV/rNVwJkG2pmcM70Bw3RhjVrl12N0ZafJTypbWgRYStkOi42iYhctPfAF2wDHZJ0lQaWZgOURghip6SrfscxV/ufVVfByUhVJEta2yjLBsZl0yZf+yCa07DTVYS7d0337R5vGUnlIKwWGyVPZ8TreBGxULMB3DJGoSpXQVmcU9t2S/BYqfjB12U+aWOxbCZuNtQ== claynelson@clays-laptop-5.lan"
-          
-          echo "\nKey fingerprints:"
-          ssh-keygen -l -f ~/.ssh/id_rsa
-          
-          # Try both key types
-          echo "Host proxy.app.avh.corellium.com
+          echo "Host proxy
+            HostName proxy.app.avh.corellium.com
             User claynelson
-            StrictHostKeyChecking no
-            UserKnownHostsFile=/dev/null
-            PubkeyAcceptedKeyTypes=+ssh-rsa
-            HostKeyAlgorithms=+ssh-rsa
-            IdentityFile ~/.ssh/id_rsa" > ~/.ssh/config
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no" > ~/.ssh/config
           chmod 600 ~/.ssh/config
           
-          # Try connecting with verbose output and alternative options
-          ssh -v -o PreferredAuthentications=publickey proxy.app.avh.corellium.com 'echo "Proxy connection successful"'
+          # Show key details
+          ssh-keygen -l -f ~/.ssh/id_rsa
+          
+          # Try connection with maximum verbosity
+          ssh -vvv proxy 'echo Connected'
       
       - name: Deploy to AVH
         run: |
-          ssh -J proxy.app.avh.corellium.com pi@10.11.0.1 'mkdir -p ~/app'
-          scp -o ProxyJump=proxy.app.avh.corellium.com build/blink pi@10.11.0.1:~/app/
-          ssh -J proxy.app.avh.corellium.com pi@10.11.0.1 'chmod +x ~/app/blink && ~/app/blink'
+          ssh -J proxy pi@10.11.0.1 'mkdir -p ~/app'
+          scp -o ProxyJump=proxy build/blink pi@10.11.0.1:~/app/
+          ssh -J proxy pi@10.11.0.1 'chmod +x ~/app/blink && ~/app/blink'
