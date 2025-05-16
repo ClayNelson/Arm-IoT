@@ -112,17 +112,18 @@ jobs:
 
       - name: Build
         run: |
-          echo "Creating build directory..."
+          echo "Setting up build directory..."
           mkdir -p build
           cd build
           
           echo "Running CMake with ARM toolchain..."
-          cmake -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc \
-                -DCMAKE_CXX_COMPILER=arm-linux-gnueabihf-g++ \
+          cmake -DCMAKE_TOOLCHAIN_FILE=../toolchains/arm-toolchain.cmake \
                 -DCMAKE_C_FLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
                 -DCMAKE_CXX_FLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
-                -DCMAKE_EXE_LINKER_FLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
                 -DCMAKE_VERBOSE_MAKEFILE=ON .. || {
+            echo "CMake configuration failed. Logs:"
+            cat CMakeFiles/CMakeError.log || true
+            exit 1
             echo "CMake configuration failed. Logs:";
             cat CMakeFiles/CMakeError.log || true;
             exit 1;
@@ -240,7 +241,13 @@ jobs:
           
           echo "Binary details:"
           file build/blink
-          readelf -h build/blink || true
+          arm-linux-gnueabihf-readelf -h build/blink || true
+          
+          echo "Binary dependencies:"
+          arm-linux-gnueabihf-readelf -d build/blink || true
+          
+          echo "Binary symbols:"
+          arm-linux-gnueabihf-nm build/blink || true
 
       - name: Wait for Device and Configure SSH
         run: |
@@ -358,7 +365,10 @@ jobs:
           retry_command "Setting permissions" 'ssh target "chmod +x /home/pi/app/blink"'
           
           echo "Checking binary on target:"
-          retry_command "Verifying binary" 'ssh target "ls -l /home/pi/app/blink && file /home/pi/app/blink && ldd /home/pi/app/blink || true"'
+          retry_command "Verifying binary" 'ssh target "ls -l /home/pi/app/blink && file /home/pi/app/blink && readelf -h /home/pi/app/blink && ldd /home/pi/app/blink"'
           
-          echo "Running blink program..."
-          retry_command "Executing binary" 'ssh target "/home/pi/app/blink"'
+          echo "Checking target system architecture:"
+          retry_command "Checking architecture" 'ssh target "uname -a && cat /proc/cpuinfo | grep -i model"'
+          
+          echo "Running blink program with debug output:"
+          retry_command "Executing binary" 'ssh -t target "cd /home/pi/app && strace -f ./blink"'
