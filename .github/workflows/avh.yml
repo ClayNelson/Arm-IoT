@@ -206,7 +206,11 @@ jobs:
           chmod 600 ~/.ssh/config
           
           # Test proxy connection
-          ssh -v proxy 'echo "Proxy connection successful"'
+          echo "Testing SSH connection to proxy..."
+          if ! ssh -v proxy 'whoami && echo "SSH_CONNECTION=$SSH_CONNECTION"'; then
+            echo "SSH connection test failed"
+            exit 1
+          fi
 
       - name: Deploy to AVH
         run: |
