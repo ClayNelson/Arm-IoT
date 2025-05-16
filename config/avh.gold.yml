@@ -28,8 +28,25 @@ network:
 
 # SSH configuration
 ssh:
+  # IMPORTANT: Use this exact format for SSH connections:
+  # ssh -J 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com pi@10.11.0.1
   enabled: true
-  port: 22
+  proxy:
+    host: proxy.app.avh.corellium.com
+    user: 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981  # UUID provided by Corellium
+  target:
+    host: 10.11.0.1
+    user: pi
+  connection:
+    # Example commands:
+    # SSH: ssh -J ${proxy.user}@${proxy.host} ${target.user}@${target.host}
+    # SCP: scp -o ProxyJump=${proxy.user}@${proxy.host} file ${target.user}@${target.host}:~/
+    type: proxyjump  # Use ProxyJump instead of port forwarding
+    format: "-J ${proxy.user}@${proxy.host} ${target.user}@${target.host}"
+  config:
+    StrictHostKeyChecking: no
+    UserKnownHostsFile: /dev/null
+    LogLevel: DEBUG3
   authorized_keys:
     - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDm0fyHb6n0WOXiTKYQ8jlfFTGS1ajtpeSO74l1AiT1eQjpPjiAipf7+gARdqjH1r3HWNF5g4BmE3IBty19Dkt9hXgU8kJz+5Yo80qLuH7GmeeSoQOBmh6XGpf6am78xNxLMf1AdO5n1XZP5eCQsC93p7F6cD3feqpZqwCXnIHtCv4r7zy1odIwTge3fqAAlLsyCb2xBysSil+yryCGhvQaXnG2diU+KGeH2mQlMyDT39U3+gwUJDnvRy7ICN1tw0H93cMMGQT0lJY2D/VoXfZc7j6G9U6jR6yS6DHg64sZPtxZVCcjAyL5A9cc7PzDEMgOTSz8hZsWtEn9EsUCwqsjTYP7+RYaWvZDHY3FlT74trd/F51lHqWZMvOvgNliRD4LeA/eh/+9rpFVXPEou/R1MXYusRfLHIvF9S6L6B9S9q8pBphjEMWVPZzv2e9qcTTvbUoGz9hg48R0TuXNG96Pyenp2lVvVFTw95HjnnrPCMCfPlurwbYhkJvLcxsM86nwhO4oNnJR98ayd+wJ78BamKBQncee7+ychBvMfZSRfgg5D41S+d0d3eupos1fZPCd5zk3K3uPoNeNTITrH80r8gbyHxAbJINa3DxPJB972jDfpzvr6w7VzmRdpLw5KfpVxJbCIwVA46upmfCDXpAz+8hFbBIC1+vNRVDD2dOMYQ== claynelson@corellium.com"
 
