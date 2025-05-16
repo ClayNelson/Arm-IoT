@@ -128,8 +128,9 @@ jobs:
           cd build
           
           echo "Running CMake with ARM toolchain..."
-          if ! cmake -DCMAKE_TOOLCHAIN_FILE=../toolchains/arm-toolchain.cmake \
-                    -DCMAKE_VERBOSE_MAKEFILE=ON ..; then
+          cmake -DCMAKE_TOOLCHAIN_FILE=../toolchains/arm-toolchain.cmake \
+                -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          if [ $? -ne 0 ]; then
             echo "CMake configuration failed. Logs:"
             cat CMakeFiles/CMakeError.log || true
             cat CMakeFiles/CMakeOutput.log || true
@@ -137,11 +138,12 @@ jobs:
           fi
           
           echo "Building project..."
-          if ! make VERBOSE=1; then
+          make VERBOSE=1
+          if [ $? -ne 0 ]; then
             echo "Build failed. Build logs:"
             find . -name "*.log" -exec cat {} \;
             exit 1
-          }
+          fi
           
           echo "Build directory contents:"
           ls -la
