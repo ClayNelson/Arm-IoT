@@ -419,16 +419,19 @@ jobs:
           
           echo "Installing dependencies on target..."
           retry_command "Installing deps" 'ssh target "set -x && \
+            sudo dpkg --add-architecture armhf && \
             sudo apt-get update && \
-            sudo apt-get install -y build-essential gcc g++ libc6 libstdc++6 \
-              libgcc1 libgpiod2 libudev1 strace && \
+            sudo apt-get install -y build-essential gcc-arm-linux-gnueabihf libc6:armhf libstdc++6:armhf \
+              libgcc1:armhf libgpiod2:armhf libudev1:armhf strace && \
+            sudo mkdir -p /lib/arm-linux-gnueabihf && \
+            sudo mkdir -p /usr/lib/arm-linux-gnueabihf && \
             sudo ldconfig && \
             echo \"System architecture:\" && \
             uname -a && \
             echo \"\nInstalled packages:\" && \
             dpkg -l | grep -E \"libc6|libstdc\" && \
             echo \"\nLibrary paths:\" && \
-            sudo ldconfig -v | grep -E \"/lib|/usr/lib\" && \
+            sudo ldconfig -v | grep -E \"/lib/arm-linux-gnueabihf|/usr/lib/arm-linux-gnueabihf\" && \
             echo \"\nLibrary cache:\" && \
             sudo ldconfig -p | grep -E \"libc.so|libstdc\""'
           
@@ -456,16 +459,11 @@ jobs:
             echo \"\nDynamic section:\" && \
             readelf -d /home/pi/app/blink && \
             echo \"\nShared library paths:\" && \
-            cat > /tmp/ld.so.conf.d/arm-libs.conf << 'EOF'
-            /lib
-            /usr/lib
-            /lib/aarch64-linux-gnu
-            /usr/lib/aarch64-linux-gnu
-            EOF
-            && sudo mv /tmp/ld.so.conf.d/arm-libs.conf /etc/ld.so.conf.d/ && \
+            sudo mkdir -p /etc/ld.so.conf.d && \
+            echo '/lib/arm-linux-gnueabihf\n/usr/lib/arm-linux-gnueabihf' | sudo tee /etc/ld.so.conf.d/arm-libs.conf && \
             sudo ldconfig && \
             echo \"\nDependency check:\" && \
-            LD_LIBRARY_PATH=/lib:/usr/lib:/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu \
+            LD_LIBRARY_PATH=/lib/arm-linux-gnueabihf:/usr/lib/arm-linux-gnueabihf \
             ldd /home/pi/app/blink || { \
               echo \"Error: Missing dependencies\"; \
               exit 1; \
@@ -481,5 +479,5 @@ jobs:
             echo \"\nSystem architecture:\" && uname -a && \
             echo \"\nExecuting binary:\" && \
             sudo bash -c \"export LD_DEBUG=libs,files && \
-              export LD_LIBRARY_PATH=/lib:/usr/lib:/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu && \
+              export LD_LIBRARY_PATH=/lib/arm-linux-gnueabihf:/usr/lib/arm-linux-gnueabihf && \
               strace -f -e trace=file,process /home/pi/app/blink 2>&1\""'
