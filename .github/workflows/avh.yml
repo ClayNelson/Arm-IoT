@@ -128,42 +128,69 @@ jobs:
       - name: Build
         run: |
           echo "Setting up build directory..."
+          rm -rf build
           mkdir -p build
           cd build
           
           echo "Running CMake with ARM toolchain..."
-          cmake -DCMAKE_TOOLCHAIN_FILE=../toolchains/arm-toolchain.cmake \
-                -DCMAKE_VERBOSE_MAKEFILE=ON .. 2>&1 | tee cmake.log
-          if [ $? -ne 0 ]; then
-            echo "CMake configuration failed. Logs:"
-            cat cmake.log
-            cat CMakeFiles/CMakeError.log || true
-            cat CMakeFiles/CMakeOutput.log || true
+          VERBOSE=1 cmake -DCMAKE_TOOLCHAIN_FILE=../toolchains/arm-toolchain.cmake \
+                -DCMAKE_BUILD_TYPE=Debug \
+                -DCMAKE_VERBOSE_MAKEFILE=ON \
+                -DCMAKE_EXPORT_COMPILE_COMMANDS=ON .. 2>&1 | tee cmake.log
+          CMAKE_EXIT=$?
+          
+          echo "CMake logs:"
+          cat cmake.log
+          if [ -f CMakeFiles/CMakeError.log ]; then
+            echo "\nCMakeError.log:"
+            cat CMakeFiles/CMakeError.log
+          fi
+          if [ -f CMakeFiles/CMakeOutput.log ]; then
+            echo "\nCMakeOutput.log:"
+            cat CMakeFiles/CMakeOutput.log
+          fi
+          
+          if [ $CMAKE_EXIT -ne 0 ]; then
+            echo "CMake configuration failed"
             exit 1
           fi
           
-          echo "CMake configuration:"
+          echo "\nCMake configuration details:"
           cmake -LA .
           
-          echo "Building project..."
-          make VERBOSE=1 2>&1 | tee make.log
-          if [ $? -ne 0 ]; then
-            echo "Build failed. Build logs:"
-            cat make.log
-            find . -name "*.log" -exec cat {} \;
+          echo "\nBuilding project..."
+          VERBOSE=1 make 2>&1 | tee make.log
+          MAKE_EXIT=${PIPESTATUS[0]}
+          
+          echo "Make logs:"
+          cat make.log
+          
+          if [ $MAKE_EXIT -ne 0 ]; then
+            echo "Build failed"
             exit 1
           fi
           
-          echo "Build directory contents:"
-          find . -type f -exec ls -l {} \;
+          echo "\nBuild directory structure:"
+          find . -type f -exec ls -lh {} \;
           
-          echo "Verifying blink binary:"
+          echo "\nVerifying blink binary:"
           if [ ! -f blink ]; then
             echo "Error: blink binary not found!"
+            echo "Contents of current directory:"
+            ls -la
+            echo "\nContents of all build subdirectories:"
+            find . -type f -name "blink" -o -name "*.o" -o -name "*.a"
             exit 1
           fi
           
+          echo "\nBinary details:"
           file ./blink
+          
+          echo "\nBinary size:"
+          ls -lh ./blink
+          
+          echo "\nBinary symbols:"
+          arm-linux-gnueabihf-nm ./blink | grep -w 'main'
           
           echo "Build directory contents:"
           ls -la
@@ -368,13 +395,6 @@ jobs:
               attempt=$((attempt + 1))
               if [ $attempt -gt $max_attempts ]; then
                 echo "Failed after $max_attempts attempts"
-                return 1
-              fi
-              
-              echo "Command failed, retrying in $delay seconds..."
-              sleep $delay
-            done
-          }
           
           echo "Deploying blink binary..."
           retry_command "Copying binary" 'scp -v build/blink target:/home/pi/app/'
@@ -382,17 +402,20 @@ jobs:
           echo "Setting executable permissions..."
           retry_command "Setting permissions" 'ssh target "chmod +x /home/pi/app/blink"'
           
-          echo "Checking binary on target:"
-          retry_command "Verifying binary" 'ssh target "ls -l /home/pi/app/blink"'
+          echo "Verifying binary on target:"
+          retry_command "Checking binary" 'ssh target "ls -lh /home/pi/app/blink"'
           
-          echo "Verifying binary format:"
+          echo "Checking binary format:"
           retry_command "Checking format" 'ssh target "file /home/pi/app/blink"'
           
-          echo "Checking target system architecture:"
-          retry_command "Checking architecture" 'ssh target "uname -a && cat /proc/cpuinfo | grep -i model"'
+          echo "Checking target system:"
+          retry_command "System info" 'ssh target "uname -a && cat /proc/cpuinfo | grep -i model"'
           
           echo "Checking binary dependencies:"
           retry_command "Checking deps" 'ssh target "ldd /home/pi/app/blink || true"'
           
-          echo "Running blink program with debug output:"
-          retry_command "Executing binary" 'ssh -t target "cd /home/pi/app && ./blink"'
+          echo "Checking GPIO access:"
+          retry_command "GPIO check" 'ssh target "ls -l /sys/class/gpio/ && groups pi"'
+          
+          echo "Running blink program:"
+          retry_command "Executing binary" 'ssh -t target "cd /home/pi/app && sudo ./blink"'
