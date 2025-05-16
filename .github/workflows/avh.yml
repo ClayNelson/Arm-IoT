@@ -242,59 +242,123 @@ jobs:
           file build/blink
           readelf -h build/blink || true
 
-      - name: Test SSH Connection
+      - name: Wait for Device and Configure SSH
         run: |
           PROXY="3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com"
           TARGET="pi@10.11.0.1"
           
+          # Create SSH config
+          mkdir -p ~/.ssh
+          cat > ~/.ssh/config << EOF
+          Host proxy
+            HostName proxy.app.avh.corellium.com
+            User 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+            ServerAliveInterval 30
+            ServerAliveCountMax 3
+            ConnectTimeout 10
+          
+          Host target
+            HostName 10.11.0.1
+            User pi
+            ProxyJump proxy
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+            ServerAliveInterval 30
+            ServerAliveCountMax 3
+            ConnectTimeout 10
+          EOF
+          
+          chmod 600 ~/.ssh/config
+          
+          # Wait for device to be available (up to 5 minutes)
+          echo "Waiting for device to be available..."
+          for i in {1..30}; do
+            if ssh -q target 'exit 0' 2>/dev/null; then
+              echo "Device is available!"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Timeout waiting for device"
+              exit 1
+            fi
+            echo "Attempt $i/30: Device not ready, waiting 10 seconds..."
+            sleep 10
+          done
+          
           echo "Testing SSH connection..."
-          if ! ssh -o ConnectTimeout=10 -v -J $PROXY $TARGET 'whoami && echo "SSH_CONNECTION=$SSH_CONNECTION"'; then
+          if ! ssh -v target 'whoami && echo "SSH_CONNECTION=$SSH_CONNECTION"'; then
             echo "SSH connection failed"
             exit 1
           fi
 
       - name: Setup Target Environment
         run: |
-          PROXY="3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com"
-          TARGET="pi@10.11.0.1"
+          function retry_command {
+            local max_attempts=3
+            local delay=10
+            local attempt=1
+            
+            while true; do
+              echo "Attempt $attempt/$max_attempts: $1"
+              if eval "$2"; then
+                return 0
+              fi
+              
+              attempt=$((attempt + 1))
+              if [ $attempt -gt $max_attempts ]; then
+                echo "Failed after $max_attempts attempts"
+                return 1
+              fi
+              
+              echo "Command failed, retrying in $delay seconds..."
+              sleep $delay
+            done
+          }
           
           echo "Creating and fixing permissions for target directory..."
-          if ! ssh -o ConnectTimeout=10 -J $PROXY $TARGET "sudo rm -rf /home/pi/app && sudo mkdir -p /home/pi/app && sudo chown -R pi:pi /home/pi/app && sudo chmod -R 755 /home/pi/app"; then
-            echo "Failed to set up target directory"
-            exit 1
-          fi
+          retry_command "Setting up app directory" 'ssh target "sudo rm -rf /home/pi/app && sudo mkdir -p /home/pi/app && sudo chown -R pi:pi /home/pi/app && sudo chmod -R 755 /home/pi/app"'
           
           echo "Setting up GPIO directory..."
-          if ! ssh -o ConnectTimeout=10 -J $PROXY $TARGET "sudo mkdir -p /sys/class/gpio && sudo chmod -R 777 /sys/class/gpio"; then
-            echo "Failed to set up GPIO directory"
-            exit 1
-          fi
+          retry_command "Setting up GPIO directory" 'ssh target "sudo mkdir -p /sys/class/gpio && sudo chmod -R 777 /sys/class/gpio"'
           
           echo "Checking target environment:"
-          ssh -o ConnectTimeout=10 -J $PROXY $TARGET "ls -ld /home/pi/app && ls -ld /sys/class/gpio"
+          retry_command "Verifying directories" 'ssh target "ls -ld /home/pi/app && ls -ld /sys/class/gpio"'
 
       - name: Deploy and Verify
         run: |
-          PROXY="3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com"
-          TARGET="pi@10.11.0.1"
+          function retry_command {
+            local max_attempts=3
+            local delay=10
+            local attempt=1
+            
+            while true; do
+              echo "Attempt $attempt/$max_attempts: $1"
+              if eval "$2"; then
+                return 0
+              fi
+              
+              attempt=$((attempt + 1))
+              if [ $attempt -gt $max_attempts ]; then
+                echo "Failed after $max_attempts attempts"
+                return 1
+              fi
+              
+              echo "Command failed, retrying in $delay seconds..."
+              sleep $delay
+            done
+          }
           
           echo "Deploying blink binary..."
-          if ! scp -v -o ConnectTimeout=10 -o ProxyJump=$PROXY build/blink $TARGET:/home/pi/app/; then
-            echo "Failed to copy binary to target"
-            exit 1
-          fi
+          retry_command "Copying binary" 'scp -v build/blink target:/home/pi/app/'
           
           echo "Setting executable permissions..."
-          if ! ssh -o ConnectTimeout=10 -J $PROXY $TARGET "chmod +x /home/pi/app/blink"; then
-            echo "Failed to set executable permissions"
-            exit 1
-          fi
+          retry_command "Setting permissions" 'ssh target "chmod +x /home/pi/app/blink"'
           
           echo "Checking binary on target:"
-          ssh -o ConnectTimeout=10 -J $PROXY $TARGET "ls -l /home/pi/app/blink && file /home/pi/app/blink && ldd /home/pi/app/blink || true"
+          retry_command "Verifying binary" 'ssh target "ls -l /home/pi/app/blink && file /home/pi/app/blink && ldd /home/pi/app/blink || true"'
           
           echo "Running blink program..."
-          if ! ssh -o ConnectTimeout=10 -J $PROXY $TARGET "/home/pi/app/blink"; then
-            echo "Failed to execute binary"
-            exit 1
-          fi
+          retry_command "Executing binary" 'ssh target "/home/pi/app/blink"'
