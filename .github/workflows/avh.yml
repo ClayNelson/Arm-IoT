@@ -15,11 +15,11 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          # Add ARM architecture
-          sudo dpkg --add-architecture armhf
+          echo "Adding ARM architecture support..."
+          sudo dpkg --add-architecture armhf || { echo "Failed to add ARM architecture"; exit 1; }
           
-          # Backup and create new sources.list
-          sudo mv /etc/apt/sources.list /etc/apt/sources.list.bak
+          echo "Configuring package sources..."
+          sudo cp /etc/apt/sources.list /etc/apt/sources.list.bak
           sudo tee /etc/apt/sources.list > /dev/null << 'EOF'
           deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse
           deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe multiverse
@@ -30,16 +30,25 @@ jobs:
           EOF
           
           echo "Updating package lists..."
-          sudo apt-get update
+          sudo apt-get update || { echo "Failed to update package lists"; exit 1; }
           
           echo "Installing build dependencies..."
-          sudo apt-get install -y cmake make gcc sshpass netcat-openbsd
+          sudo apt-get install -y cmake make gcc sshpass netcat-openbsd || { echo "Failed to install build dependencies"; exit 1; }
           
           echo "Installing ARM toolchain..."
-          sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+          sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf || { echo "Failed to install ARM toolchain"; exit 1; }
           
           echo "Installing ARM runtime libraries..."
-          sudo apt-get install -y libc6:armhf libstdc++6:armhf
+          sudo apt-get install -y libc6:armhf libstdc++6:armhf || { echo "Failed to install ARM runtime libraries"; exit 1; }
+          
+          echo "Setting up toolchain paths..."
+          TOOLCHAIN_PATH=$(dirname $(find /usr -name arm-linux-gnueabihf-gcc 2>/dev/null | head -n1))
+          if [ -z "$TOOLCHAIN_PATH" ]; then
+            echo "Error: Could not find ARM toolchain directory"
+            exit 1
+          fi
+          echo "Found toolchain in: $TOOLCHAIN_PATH"
+          export PATH="$TOOLCHAIN_PATH:$PATH"
           
           echo "Verifying toolchain installation..."
           if ! which arm-linux-gnueabihf-gcc; then
@@ -51,10 +60,10 @@ jobs:
           fi
           
           echo "ARM toolchain version:"
-          arm-linux-gnueabihf-gcc --version
+          arm-linux-gnueabihf-gcc --version || { echo "Failed to get toolchain version"; exit 1; }
           
           echo "Checking ARM library dependencies:"
-          dpkg -l | grep "armhf"
+          dpkg -l | grep "armhf" || { echo "No ARM libraries found"; exit 1; }
 
       - name: Verify Environment
         run: |
