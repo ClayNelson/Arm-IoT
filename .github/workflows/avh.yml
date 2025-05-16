@@ -38,33 +38,41 @@ jobs:
           # Verify toolchain installation
           arm-linux-gnueabihf-gcc --version
 
+      - name: Verify Environment
+        run: |
+          echo "Checking ARM toolchain..."
+          which arm-linux-gnueabihf-gcc || { echo "ARM GCC not found"; exit 1; }
+          arm-linux-gnueabihf-gcc --version
+          
+          echo "Checking toolchain directory..."
+          ls -la toolchains/
+          
+          echo "Verifying toolchain file contents..."
+          cat toolchains/arm-toolchain.cmake
+          
+          echo "Checking source files..."
+          ls -la src/
+
       - name: Build
         run: |
           echo "Creating build directory..."
+          rm -rf build
           mkdir -p build
           cd build
           
-          echo "Checking toolchain file..."
-          if [ ! -f ../toolchains/arm-toolchain.cmake ]; then
-            echo "Error: Toolchain file not found"
-            exit 1
-          fi
-          cat ../toolchains/arm-toolchain.cmake
-          
           echo "Running CMake with ARM toolchain..."
-          CFLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
-          CXXFLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
-          LDFLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
           cmake -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_TOOLCHAIN_FILE=../toolchains/arm-toolchain.cmake \
                 -DCMAKE_C_FLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
                 -DCMAKE_CXX_FLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
-                -DCMAKE_EXE_LINKER_FLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" ..
+                -DCMAKE_EXE_LINKER_FLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
+                -DCMAKE_VERBOSE_MAKEFILE=ON \
+                ..
           
-          echo "CMake cache contents:"
-          cat CMakeCache.txt
+          echo "CMake configuration:"
+          cmake -LA .
           
-          echo "Running Make..."
+          echo "Building..."
           make VERBOSE=1
           
           echo "Build directory contents:"
@@ -72,14 +80,17 @@ jobs:
           
           if [ ! -f blink ]; then
             echo "Error: Build step did not produce the 'blink' binary."
-            echo "Checking CMake error log:"
+            echo "CMake error log:"
             cat CMakeFiles/CMakeError.log || true
+            echo "CMake output log:"
+            cat CMakeFiles/CMakeOutput.log || true
             exit 1
           fi
           
-          echo "Checking binary type:"
+          echo "Binary information:"
           file blink
           readelf -h blink || true
+          ldd blink || true
 
       - name: Configure SSH
         run: |
@@ -136,65 +147,62 @@ jobs:
         run: |
           echo "Deploying blink binary to AVH..."
           
-          echo "Build directory contents:"
-          ls -la build/
-          
-          echo "Network configuration:"
-          netstat -nr
-          ip route || true
-          
-          echo "DNS resolution:"
+          echo "Network diagnostics:"
+          echo "1. DNS resolution:"
           dig +short proxy.app.avh.corellium.com || true
-          nslookup proxy.app.avh.corellium.com || true
+          host proxy.app.avh.corellium.com || true
           
-          echo "Testing proxy connectivity:"
+          echo "2. Network routes:"
+          ip route
+          
+          echo "3. Testing proxy connectivity:"
           for port in 22 2003 2222; do
             echo "Testing port $port..."
-            nc -zv proxy.app.avh.corellium.com $port || true
+            timeout 5 nc -zv proxy.app.avh.corellium.com $port || true
           done
           
-          echo "SSH debug information:"
-          ssh -vvv proxy echo "SSH connection test" || true
-          
-          echo "SSH key information:"
-          ssh-keygen -l -f ~/.ssh/id_rsa
-          echo "Public key contents:"
-          cat ~/.ssh/id_rsa.pub
-          
-          echo "SSH config:"
+          echo "4. SSH configuration:"
+          ls -la ~/.ssh/
           cat ~/.ssh/config
           
-          # Set up port forwarding tunnel
-          echo "Setting up port forwarding tunnel..."
-          ssh -f -N proxy
-          sleep 5
+          echo "5. SSH key verification:"
+          ssh-keygen -l -f ~/.ssh/id_rsa
           
-          # Test connection through tunnel
-          echo "Testing connection through tunnel..."
-          if ! ssh -v target echo "SSH connection successful!"; then
-            echo "Failed to connect through tunnel. Trying direct connection..."
-            if ! ssh -v proxy echo "Direct SSH connection successful!"; then
-              echo "All connection attempts failed."
+          echo "6. Testing direct SSH connection:"
+          ssh -v -o ConnectTimeout=10 proxy echo "Direct connection test" || true
+          
+          echo "7. Setting up tunnel:"
+          ssh -f -N -v -o ExitOnForwardFailure=yes proxy
+          
+          echo "8. Waiting for tunnel:"
+          for i in {1..6}; do
+            echo "Attempt $i: Testing local forward..."
+            if nc -z localhost 2222; then
+              echo "Local forward is working"
+              break
+            fi
+            if [ $i -eq 6 ]; then
+              echo "Failed to establish local forward"
               exit 1
             fi
-          fi
+            sleep 5
+          done
           
-          # Test target connectivity
-          echo "Testing target connectivity..."
-          if ! ssh -v target echo "Target reachable"; then
-            echo "Failed to connect to target device."
+          echo "9. Testing target connection:"
+          if ! ssh -v -o ConnectTimeout=10 target echo "Target test"; then
+            echo "Failed to connect to target"
+            ps aux | grep ssh
             exit 1
           fi
           
-          # Attempt deployment
-          echo "Copying binary to target..."
-          if ! scp -v build/blink target:~/; then
-            echo "Failed to copy binary."
+          echo "10. Copying binary:"
+          if ! scp -v -o ConnectTimeout=10 build/blink target:~/; then
+            echo "Failed to copy binary"
             exit 1
           fi
           
-          echo "Setting permissions and running binary..."
+          echo "11. Setting permissions and running:"
           if ! ssh -v target "chmod +x ~/blink && ~/blink"; then
-            echo "Failed to execute binary on target."
+            echo "Failed to execute binary"
             exit 1
           fi
