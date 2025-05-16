@@ -229,16 +229,23 @@ jobs:
             exit 1
           fi
 
+      - name: Fix Target Directory Permissions
+        run: |
+          PROXY="3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com"
+          TARGET="pi@10.11.0.1"
+          
+          echo "Ensuring correct permissions for target directory..."
+          ssh -J $PROXY $TARGET 'sudo mkdir -p ~/app && sudo chown pi:pi ~/app && chmod 755 ~/app'
+          
+          echo "Setting up GPIO directory..."
+          ssh -J $PROXY $TARGET 'sudo mkdir -p /sys/class/gpio && sudo chmod -R 777 /sys/class/gpio'
+
       - name: Deploy to AVH
         run: |
           PROXY="3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com"
           TARGET="pi@10.11.0.1"
           
-          echo "Setting up GPIO directory..."
-          ssh -J $PROXY $TARGET 'sudo mkdir -p /sys/class/gpio && sudo chmod -R 777 /sys/class/gpio'
-          
           echo "Deploying blink binary..."
-          ssh -J $PROXY $TARGET 'mkdir -p ~/app'
           scp -o ProxyJump=$PROXY build/blink $TARGET:~/app/
           
           echo "Running blink program..."
