@@ -110,139 +110,41 @@ jobs:
 
       - name: Configure SSH
         run: |
-          # Create SSH directory and set permissions
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          
-          # Write private key and set permissions
           echo "${{ secrets.AVH_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          
-          # Generate public key
           ssh-keygen -y -f ~/.ssh/id_rsa > ~/.ssh/id_rsa.pub
           chmod 644 ~/.ssh/id_rsa.pub
-          
-          # Create SSH config with enhanced settings
           cat > ~/.ssh/config << 'EOF'
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            LogLevel DEBUG3
+
           Host proxy
             HostName proxy.app.avh.corellium.com
-            Port 22
-            User 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981
+            User claynelson
             IdentityFile ~/.ssh/id_rsa
-            PreferredAuthentications publickey
-            PubkeyAcceptedKeyTypes +ssh-rsa
-            HostKeyAlgorithms +ssh-rsa
-            KexAlgorithms +diffie-hellman-group14-sha1
-            StrictHostKeyChecking no
-            UserKnownHostsFile=/dev/null
-            LogLevel DEBUG3
-            ServerAliveInterval 30
-            ServerAliveCountMax 3
-            ConnectTimeout 30
-            LocalForward 2222 10.11.0.1:22
-
+            
           Host target
-            HostName localhost
-            Port 2222
+            HostName 10.11.0.1
             User pi
-            IdentityFile ~/.ssh/id_rsa
-            StrictHostKeyChecking no
-            UserKnownHostsFile=/dev/null
-            LogLevel DEBUG3
-            ServerAliveInterval 30
-            ServerAliveCountMax 3
-            ConnectTimeout 30
+            ProxyJump proxy
           EOF
           chmod 600 ~/.ssh/config
           
-          # Test SSH connection with debugging
-          echo "Testing SSH connection to proxy..."
-          ssh -v proxy echo "SSH connection successful!" || echo "SSH connection failed"
+          # Test proxy connection
+          ssh -v proxy 'echo "Proxy connection successful"'
 
       - name: Deploy to AVH
         run: |
-          echo "Deploying blink binary to AVH..."
+          echo "Setting up GPIO directory..."
+          ssh target 'sudo mkdir -p /sys/class/gpio && sudo chmod -R 777 /sys/class/gpio'
           
-          echo "1. Verifying binary:"
-          if [ ! -f build/blink ]; then
-            echo "Error: blink binary not found"
-            exit 1
-          fi
-          file build/blink
+          echo "Deploying blink binary..."
+          ssh target 'mkdir -p ~/app'
+          scp build/blink target:~/app/
           
-          echo "2. Network diagnostics:"
-          echo "DNS resolution:"
-          dig +short proxy.app.avh.corellium.com || true
-          host proxy.app.avh.corellium.com || true
-          
-          echo "Network routes:"
-          ip route
-          
-          echo "3. Testing proxy connectivity:"
-          for port in 22 2003 2222; do
-            echo "Testing port $port..."
-            if timeout 5 nc -zv proxy.app.avh.corellium.com $port; then
-              echo "Success: Port $port is open"
-              PROXY_PORT=$port
-              break
-            fi
-          done
-          
-          if [ -z "$PROXY_PORT" ]; then
-            echo "Error: No open ports found on proxy"
-            exit 1
-          fi
-          
-          echo "4. SSH configuration:"
-          ls -la ~/.ssh/
-          cat ~/.ssh/config
-          
-          echo "5. SSH key verification:"
-          ssh-keygen -l -f ~/.ssh/id_rsa
-          
-          echo "6. Testing direct SSH connection:"
-          if ! ssh -v -o ConnectTimeout=10 -p $PROXY_PORT proxy echo "Direct connection test"; then
-            echo "Error: Direct SSH connection failed"
-            exit 1
-          fi
-          
-          echo "7. Setting up tunnel:"
-          ssh -f -N -v -o ExitOnForwardFailure=yes -o ConnectTimeout=10 proxy
-          
-          echo "8. Waiting for tunnel:"
-          for i in {1..6}; do
-            echo "Attempt $i: Testing local forward..."
-            if nc -z localhost 2222; then
-              echo "Success: Local forward is working"
-              break
-            fi
-            if [ $i -eq 6 ]; then
-              echo "Error: Failed to establish local forward"
-              ps aux | grep ssh
-              exit 1
-            fi
-            sleep 5
-          done
-          
-          echo "9. Testing target connection:"
-          if ! ssh -v -o ConnectTimeout=10 target "echo 'Target test' && ls -la /sys/class/gpio || true"; then
-            echo "Error: Target connection failed"
-            ps aux | grep ssh
-            exit 1
-          fi
-          
-          echo "10. Copying and running binary:"
-          if ! scp -v -o ConnectTimeout=10 build/blink target:~/; then
-            echo "Error: Failed to copy binary"
-            exit 1
-          fi
-          
-          ssh -v target "echo 'Setting up GPIO...' && \
-                       sudo mkdir -p /sys/class/gpio && \
-                       sudo chmod -R 777 /sys/class/gpio && \
-                       echo 'Running blink...' && \
-                       chmod +x ~/blink && \
-                       ~/blink" || {
-            echo "Error: Failed to execute binary"
-            exit 1
-          }
+          echo "Running blink program..."
+          ssh target 'chmod +x ~/app/blink && ~/app/blink'
