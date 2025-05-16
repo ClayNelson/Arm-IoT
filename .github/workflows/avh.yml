@@ -196,9 +196,31 @@ jobs:
           PROXY="3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com"
           TARGET="pi@10.11.0.1"
           
-          # First attempt to copy SSH key to target
+          # Install expect
+          sudo apt-get update && sudo apt-get install -y expect
+          
+          # Create SSH key copy script
+          cat > copy_key.exp << 'EOF'
+          #!/usr/bin/expect -f
+          set timeout 30
+          set proxy [lindex $argv 0]
+          set target [lindex $argv 1]
+          set key [lindex $argv 2]
+          
+          spawn bash -c "echo $key | ssh -o ConnectTimeout=10 -J $proxy $target 'mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'"
+          expect {
+            -re ".*password:" { send "raspberry\r"; exp_continue }
+            timeout { exit 1 }
+            eof { exit [lindex [wait] 3] }
+          }
+          EOF
+          
+          chmod +x copy_key.exp
+          
+          # Copy SSH key using expect script
           echo "Copying SSH key to target..."
-          cat ~/.ssh/id_rsa.pub | ssh -o ConnectTimeout=10 -J $PROXY $TARGET 'mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'
+          KEY=$(cat ~/.ssh/id_rsa.pub)
+          ./copy_key.exp "$PROXY" "$TARGET" "$KEY"
           
           # Test SSH connection with key auth
           echo "Testing SSH connection..."
