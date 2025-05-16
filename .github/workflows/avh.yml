@@ -189,6 +189,10 @@ jobs:
           echo "\nBinary size:"
           ls -lh ./blink
           
+          echo "\nVerifying ARM architecture:"
+          arm-linux-gnueabihf-readelf -h ./blink | tee readelf.log
+          grep -q "Machine:.*ARM" readelf.log || { echo "Error: Binary is not for ARM architecture"; exit 1; }
+          
           echo "\nBinary symbols:"
           arm-linux-gnueabihf-nm ./blink | grep -w 'main'
           
@@ -410,6 +414,12 @@ jobs:
             exit 1
           fi
           
+          echo "Creating app directory on target..."
+          retry_command "Creating directory" 'ssh target "sudo mkdir -p /home/pi/app && sudo chown pi:pi /home/pi/app"'
+          
+          echo "Installing dependencies on target..."
+          retry_command "Installing deps" 'ssh target "sudo apt-get update && sudo apt-get install -y libc6:armhf libstdc++6:armhf"'
+          
           echo "Deploying blink binary..."
           retry_command "Copying binary" 'scp -v build/blink target:/home/pi/app/'
           
@@ -426,10 +436,10 @@ jobs:
           retry_command "System info" 'ssh target "uname -a && cat /proc/cpuinfo | grep -i model"'
           
           echo "Checking binary dependencies:"
-          retry_command "Checking deps" 'ssh target "ldd /home/pi/app/blink || true"'
+          retry_command "Checking deps" 'ssh target "ldd /home/pi/app/blink || { echo \"Error: Missing dependencies\"; exit 1; }"'
           
           echo "Checking GPIO access:"
-          retry_command "GPIO check" 'ssh target "ls -l /sys/class/gpio/ && groups pi"'
+          retry_command "GPIO check" 'ssh target "sudo ls -l /sys/class/gpio/ && groups pi"'
           
           echo "Running blink program:"
-          retry_command "Executing binary" 'ssh target "cd /home/pi/app && pwd && ls -la && sudo /home/pi/app/blink"'
+          retry_command "Executing binary" 'ssh target "cd /home/pi/app && sudo LD_LIBRARY_PATH=/lib:/usr/lib /home/pi/app/blink"'
