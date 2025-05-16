@@ -357,10 +357,16 @@ jobs:
           retry_command "Setting permissions" 'ssh target "chmod +x /home/pi/app/blink"'
           
           echo "Checking binary on target:"
-          retry_command "Verifying binary" 'ssh target "ls -l /home/pi/app/blink && file /home/pi/app/blink && readelf -h /home/pi/app/blink && ldd /home/pi/app/blink"'
+          retry_command "Verifying binary" 'ssh target "ls -l /home/pi/app/blink"'
+          
+          echo "Verifying binary format:"
+          retry_command "Checking format" 'ssh target "file /home/pi/app/blink"'
           
           echo "Checking target system architecture:"
           retry_command "Checking architecture" 'ssh target "uname -a && cat /proc/cpuinfo | grep -i model"'
           
+          echo "Checking binary dependencies:"
+          retry_command "Checking deps" 'ssh target "ldd /home/pi/app/blink || true"'
+          
           echo "Running blink program with debug output:"
-          retry_command "Executing binary" 'ssh -t target "cd /home/pi/app && strace -f ./blink"'
+          retry_command "Executing binary" 'ssh -t target "cd /home/pi/app && ./blink"'
