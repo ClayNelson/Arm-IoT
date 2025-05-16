@@ -24,7 +24,6 @@ jobs:
           deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse
           deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe multiverse
           deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-security main restricted universe multiverse
-          
           deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ jammy main restricted universe multiverse
           deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ jammy-updates main restricted universe multiverse
           deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ jammy-security main restricted universe multiverse
@@ -32,8 +31,9 @@ jobs:
           
           # Update and install dependencies
           sudo apt-get update
-          sudo apt-get install -y cmake make gcc sshpass
+          sudo apt-get install -y cmake make gcc sshpass netcat-openbsd
           sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+          sudo apt-get install -y libc6:armhf libstdc++6:armhf
           
           # Verify toolchain installation
           arm-linux-gnueabihf-gcc --version
@@ -67,13 +67,23 @@ jobs:
                 -DCMAKE_CXX_FLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
                 -DCMAKE_EXE_LINKER_FLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
                 -DCMAKE_VERBOSE_MAKEFILE=ON \
-                ..
+                .. || {
+            echo "CMake configuration failed. Logs:"
+            cat CMakeFiles/CMakeError.log || true
+            cat CMakeFiles/CMakeOutput.log || true
+            exit 1
+          }
           
           echo "CMake configuration:"
           cmake -LA .
           
           echo "Building..."
-          make VERBOSE=1
+          make VERBOSE=1 || {
+            echo "Build failed. Logs:"
+            cat CMakeFiles/CMakeError.log || true
+            cat CMakeFiles/CMakeOutput.log || true
+            exit 1
+          }
           
           echo "Build directory contents:"
           ls -la
@@ -91,6 +101,12 @@ jobs:
           file blink
           readelf -h blink || true
           ldd blink || true
+          
+          echo "Verifying binary architecture:"
+          if ! file blink | grep -q "ARM"; then
+            echo "Error: Binary is not compiled for ARM"
+            exit 1
+          fi
 
       - name: Configure SSH
         run: |
@@ -147,19 +163,35 @@ jobs:
         run: |
           echo "Deploying blink binary to AVH..."
           
-          echo "Network diagnostics:"
-          echo "1. DNS resolution:"
+          echo "1. Verifying binary:"
+          if [ ! -f build/blink ]; then
+            echo "Error: blink binary not found"
+            exit 1
+          fi
+          file build/blink
+          
+          echo "2. Network diagnostics:"
+          echo "DNS resolution:"
           dig +short proxy.app.avh.corellium.com || true
           host proxy.app.avh.corellium.com || true
           
-          echo "2. Network routes:"
+          echo "Network routes:"
           ip route
           
           echo "3. Testing proxy connectivity:"
           for port in 22 2003 2222; do
             echo "Testing port $port..."
-            timeout 5 nc -zv proxy.app.avh.corellium.com $port || true
+            if timeout 5 nc -zv proxy.app.avh.corellium.com $port; then
+              echo "Success: Port $port is open"
+              PROXY_PORT=$port
+              break
+            fi
           done
+          
+          if [ -z "$PROXY_PORT" ]; then
+            echo "Error: No open ports found on proxy"
+            exit 1
+          fi
           
           echo "4. SSH configuration:"
           ls -la ~/.ssh/
@@ -169,40 +201,48 @@ jobs:
           ssh-keygen -l -f ~/.ssh/id_rsa
           
           echo "6. Testing direct SSH connection:"
-          ssh -v -o ConnectTimeout=10 proxy echo "Direct connection test" || true
+          if ! ssh -v -o ConnectTimeout=10 -p $PROXY_PORT proxy echo "Direct connection test"; then
+            echo "Error: Direct SSH connection failed"
+            exit 1
+          fi
           
           echo "7. Setting up tunnel:"
-          ssh -f -N -v -o ExitOnForwardFailure=yes proxy
+          ssh -f -N -v -o ExitOnForwardFailure=yes -o ConnectTimeout=10 proxy
           
           echo "8. Waiting for tunnel:"
           for i in {1..6}; do
             echo "Attempt $i: Testing local forward..."
             if nc -z localhost 2222; then
-              echo "Local forward is working"
+              echo "Success: Local forward is working"
               break
             fi
             if [ $i -eq 6 ]; then
-              echo "Failed to establish local forward"
+              echo "Error: Failed to establish local forward"
+              ps aux | grep ssh
               exit 1
             fi
             sleep 5
           done
           
           echo "9. Testing target connection:"
-          if ! ssh -v -o ConnectTimeout=10 target echo "Target test"; then
-            echo "Failed to connect to target"
+          if ! ssh -v -o ConnectTimeout=10 target "echo 'Target test' && ls -la /sys/class/gpio || true"; then
+            echo "Error: Target connection failed"
             ps aux | grep ssh
             exit 1
           fi
           
-          echo "10. Copying binary:"
+          echo "10. Copying and running binary:"
           if ! scp -v -o ConnectTimeout=10 build/blink target:~/; then
-            echo "Failed to copy binary"
+            echo "Error: Failed to copy binary"
             exit 1
           fi
           
-          echo "11. Setting permissions and running:"
-          if ! ssh -v target "chmod +x ~/blink && ~/blink"; then
-            echo "Failed to execute binary"
+          ssh -v target "echo 'Setting up GPIO...' && \
+                       sudo mkdir -p /sys/class/gpio && \
+                       sudo chmod -R 777 /sys/class/gpio && \
+                       echo 'Running blink...' && \
+                       chmod +x ~/blink && \
+                       ~/blink" || {
+            echo "Error: Failed to execute binary"
             exit 1
-          fi
+          }
