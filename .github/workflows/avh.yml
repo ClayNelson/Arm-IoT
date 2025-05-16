@@ -432,4 +432,4 @@ jobs:
           retry_command "GPIO check" 'ssh target "ls -l /sys/class/gpio/ && groups pi"'
           
           echo "Running blink program:"
-          retry_command "Executing binary" 'ssh -t target "cd /home/pi/app && sudo ./blink"'
+          retry_command "Executing binary" 'ssh target "cd /home/pi/app && pwd && ls -la && sudo /home/pi/app/blink"'
