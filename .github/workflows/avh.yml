@@ -421,10 +421,16 @@ jobs:
           retry_command "Installing deps" 'ssh target "set -x && \
             sudo apt-get update && \
             sudo apt-get install -y build-essential gcc g++ libc6 libstdc++6 \
-              libgcc1 libgpiod2 libudev1 && \
+              libgcc1 libgpiod2 libudev1 strace && \
             sudo ldconfig && \
-            echo \"Installed packages:\" && \
-            dpkg -l | grep -E \"libc6|libstdc\""'
+            echo \"System architecture:\" && \
+            uname -a && \
+            echo \"\nInstalled packages:\" && \
+            dpkg -l | grep -E \"libc6|libstdc\" && \
+            echo \"\nLibrary paths:\" && \
+            sudo ldconfig -v | grep -E \"/lib|/usr/lib\" && \
+            echo \"\nLibrary cache:\" && \
+            sudo ldconfig -p | grep -E \"libc.so|libstdc\""'
           
           echo "Deploying blink binary..."
           retry_command "Copying binary" 'scp -v build/blink target:/home/pi/app/'
@@ -441,16 +447,27 @@ jobs:
           echo "Checking target system:"
           retry_command "System info" 'ssh target "uname -a && cat /proc/cpuinfo | grep -i model"'
           
-          echo "Checking binary dependencies:"
-          retry_command "Checking deps" 'ssh target "set -x && \
+          echo "Setting up library paths..."
+          retry_command "Library setup" 'ssh target "set -x && \
             echo \"System libraries:\" && \
             ls -l /lib/aarch64-linux-gnu/libc.so* /usr/lib/aarch64-linux-gnu/libstdc++.so* && \
             echo \"\nBinary info:\" && \
             file /home/pi/app/blink && \
+            echo \"\nDynamic section:\" && \
+            readelf -d /home/pi/app/blink && \
+            echo \"\nShared library paths:\" && \
+            cat > /tmp/ld.so.conf.d/arm-libs.conf << 'EOF'
+            /lib
+            /usr/lib
+            /lib/aarch64-linux-gnu
+            /usr/lib/aarch64-linux-gnu
+            EOF
+            && sudo mv /tmp/ld.so.conf.d/arm-libs.conf /etc/ld.so.conf.d/ && \
+            sudo ldconfig && \
             echo \"\nDependency check:\" && \
+            LD_LIBRARY_PATH=/lib:/usr/lib:/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu \
             ldd /home/pi/app/blink || { \
               echo \"Error: Missing dependencies\"; \
-              readelf -d /home/pi/app/blink; \
               exit 1; \
             }"'
           
@@ -463,5 +480,6 @@ jobs:
             echo \"\nBinary permissions:\" && ls -l blink && \
             echo \"\nSystem architecture:\" && uname -a && \
             echo \"\nExecuting binary:\" && \
-            sudo bash -c \"export LD_LIBRARY_PATH=/lib:/usr/lib:/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu && \
-              strace -f /home/pi/app/blink 2>&1\""'
+            sudo bash -c \"export LD_DEBUG=libs,files && \
+              export LD_LIBRARY_PATH=/lib:/usr/lib:/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu && \
+              strace -f -e trace=file,process /home/pi/app/blink 2>&1\""'
