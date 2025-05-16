@@ -421,19 +421,26 @@ jobs:
           retry_command "Installing deps" 'ssh target "set -x && \
             sudo dpkg --add-architecture armhf && \
             sudo apt-get update && \
-            sudo apt-get install -y build-essential gcc-arm-linux-gnueabihf libc6:armhf libstdc++6:armhf \
-              libgcc1:armhf libgpiod2:armhf libudev1:armhf strace && \
-            sudo mkdir -p /lib/arm-linux-gnueabihf && \
-            sudo mkdir -p /usr/lib/arm-linux-gnueabihf && \
+            sudo apt-get install -y multiarch-support && \
+            sudo apt-get install -y \
+              libc6:armhf \
+              libstdc++6:armhf \
+              libgcc1:armhf \
+              libgpiod2:armhf \
+              libudev1:armhf \
+              strace && \
+            sudo mkdir -p /lib/arm-linux-gnueabihf /usr/lib/arm-linux-gnueabihf && \
+            sudo ln -sf /lib/ld-linux-armhf.so.3 /lib/arm-linux-gnueabihf/ && \
             sudo ldconfig && \
             echo \"System architecture:\" && \
             uname -a && \
             echo \"\nInstalled packages:\" && \
             dpkg -l | grep -E \"libc6|libstdc\" && \
             echo \"\nLibrary paths:\" && \
+            ls -l /lib/arm-linux-gnueabihf/ld-linux-armhf.so.3 && \
             sudo ldconfig -v | grep -E \"/lib/arm-linux-gnueabihf|/usr/lib/arm-linux-gnueabihf\" && \
             echo \"\nLibrary cache:\" && \
-            sudo ldconfig -p | grep -E \"libc.so|libstdc\""'
+            sudo ldconfig -p | grep -E \"ld-linux-armhf|libc.so|libstdc\""'
           
           echo "Deploying blink binary..."
           retry_command "Copying binary" 'scp -v build/blink target:/home/pi/app/'
@@ -453,19 +460,22 @@ jobs:
           echo "Setting up library paths..."
           retry_command "Library setup" 'ssh target "set -x && \
             echo \"System libraries:\" && \
-            ls -l /lib/aarch64-linux-gnu/libc.so* /usr/lib/aarch64-linux-gnu/libstdc++.so* && \
+            ls -l /lib/arm-linux-gnueabihf/libc.so* /usr/lib/arm-linux-gnueabihf/libstdc++.so* && \
             echo \"\nBinary info:\" && \
             file /home/pi/app/blink && \
             echo \"\nDynamic section:\" && \
             readelf -d /home/pi/app/blink && \
+            echo \"\nInterpreter check:\" && \
+            readelf -l /home/pi/app/blink | grep interpreter && \
             echo \"\nShared library paths:\" && \
             sudo mkdir -p /etc/ld.so.conf.d && \
             echo '/lib/arm-linux-gnueabihf\n/usr/lib/arm-linux-gnueabihf' | sudo tee /etc/ld.so.conf.d/arm-libs.conf && \
             sudo ldconfig && \
             echo \"\nDependency check:\" && \
-            LD_LIBRARY_PATH=/lib/arm-linux-gnueabihf:/usr/lib/arm-linux-gnueabihf \
+            LD_DEBUG=libs LD_LIBRARY_PATH=/lib/arm-linux-gnueabihf:/usr/lib/arm-linux-gnueabihf \
             ldd /home/pi/app/blink || { \
               echo \"Error: Missing dependencies\"; \
+              readelf -d /home/pi/app/blink; \
               exit 1; \
             }"'
           
