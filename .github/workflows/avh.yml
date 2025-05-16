@@ -124,8 +124,12 @@ jobs:
 
           Host proxy
             HostName proxy.app.avh.corellium.com
-            User claynelson
+            User 3ac4e20f-02f4-45bb-bfbd-9f6e3029f981
             IdentityFile ~/.ssh/id_rsa
+            PreferredAuthentications publickey
+            PubkeyAcceptedKeyTypes +ssh-rsa
+            HostKeyAlgorithms +ssh-rsa
+            KexAlgorithms +diffie-hellman-group14-sha1
             
           Host target
             HostName 10.11.0.1
