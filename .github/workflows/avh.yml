@@ -196,21 +196,14 @@ jobs:
           PROXY="3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com"
           TARGET="pi@10.11.0.1"
           
-          # Test proxy connection first
-          echo "Testing proxy connection..."
-          if ! ssh -v $PROXY 'whoami'; then
-            echo "Proxy connection failed"
-            exit 1
-          fi
-          
-          # Copy SSH key to target
+          # First attempt to copy SSH key to target
           echo "Copying SSH key to target..."
-          cat ~/.ssh/id_rsa.pub | ssh -J $PROXY $TARGET 'mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'
+          cat ~/.ssh/id_rsa.pub | ssh -o ConnectTimeout=10 -J $PROXY $TARGET 'mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'
           
-          # Test target connection
-          echo "Testing target connection..."
-          if ! ssh -v -J $PROXY $TARGET 'whoami && echo "SSH_CONNECTION=$SSH_CONNECTION"'; then
-            echo "Target connection failed"
+          # Test SSH connection with key auth
+          echo "Testing SSH connection..."
+          if ! ssh -o ConnectTimeout=10 -v -J $PROXY $TARGET 'whoami && echo "SSH_CONNECTION=$SSH_CONNECTION"'; then
+            echo "SSH connection failed"
             exit 1
           fi
 
