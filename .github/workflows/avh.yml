@@ -395,6 +395,20 @@ jobs:
               attempt=$((attempt + 1))
               if [ $attempt -gt $max_attempts ]; then
                 echo "Failed after $max_attempts attempts"
+                return 1
+              fi
+              
+              echo "Command failed, retrying in $delay seconds..."
+              sleep $delay
+            done
+          }
+          
+          if [ ! -f build/blink ]; then
+            echo "Error: blink binary not found in build directory!"
+            echo "Build directory contents:"
+            ls -la build/
+            exit 1
+          fi
           
           echo "Deploying blink binary..."
           retry_command "Copying binary" 'scp -v build/blink target:/home/pi/app/'
