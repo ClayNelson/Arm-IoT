@@ -120,6 +120,10 @@ jobs:
           echo "Verifying ARM toolchain..."
           arm-linux-gnueabihf-gcc --version
           arm-linux-gnueabihf-g++ --version
+          
+          echo "Verifying source files..."
+          ls -la src/
+          cat src/main.c
 
       - name: Build
         run: |
@@ -129,21 +133,37 @@ jobs:
           
           echo "Running CMake with ARM toolchain..."
           cmake -DCMAKE_TOOLCHAIN_FILE=../toolchains/arm-toolchain.cmake \
-                -DCMAKE_VERBOSE_MAKEFILE=ON ..
+                -DCMAKE_VERBOSE_MAKEFILE=ON .. 2>&1 | tee cmake.log
           if [ $? -ne 0 ]; then
             echo "CMake configuration failed. Logs:"
+            cat cmake.log
             cat CMakeFiles/CMakeError.log || true
             cat CMakeFiles/CMakeOutput.log || true
             exit 1
           fi
           
+          echo "CMake configuration:"
+          cmake -LA .
+          
           echo "Building project..."
-          make VERBOSE=1
+          make VERBOSE=1 2>&1 | tee make.log
           if [ $? -ne 0 ]; then
             echo "Build failed. Build logs:"
+            cat make.log
             find . -name "*.log" -exec cat {} \;
             exit 1
           fi
+          
+          echo "Build directory contents:"
+          find . -type f -exec ls -l {} \;
+          
+          echo "Verifying blink binary:"
+          if [ ! -f blink ]; then
+            echo "Error: blink binary not found!"
+            exit 1
+          fi
+          
+          file ./blink
           
           echo "Build directory contents:"
           ls -la
@@ -227,19 +247,25 @@ jobs:
           echo "Verifying blink binary..."
           if [ ! -f "build/blink" ]; then
             echo "Error: build/blink binary not found!"
-            ls -la build/
+            echo "Build directory contents:"
+            find build -type f -exec ls -l {} \;
             exit 1
           fi
           
           echo "Binary details:"
           file build/blink
-          arm-linux-gnueabihf-readelf -h build/blink || true
+          
+          echo "Binary architecture:"
+          arm-linux-gnueabihf-readelf -A build/blink || true
           
           echo "Binary dependencies:"
           arm-linux-gnueabihf-readelf -d build/blink || true
           
           echo "Binary symbols:"
           arm-linux-gnueabihf-nm build/blink || true
+          
+          echo "Binary size:"
+          arm-linux-gnueabihf-size build/blink || true
 
       - name: Wait for Device and Configure SSH
         run: |
