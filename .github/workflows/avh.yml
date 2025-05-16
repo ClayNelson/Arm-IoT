@@ -418,9 +418,13 @@ jobs:
           retry_command "Creating directory" 'ssh target "sudo mkdir -p /home/pi/app && sudo chown pi:pi /home/pi/app"'
           
           echo "Installing dependencies on target..."
-          retry_command "Installing deps" 'ssh target "sudo apt-get update && \
-            sudo apt-get install -y build-essential gcc g++ libc6 libstdc++6 && \
-            sudo ldconfig"'
+          retry_command "Installing deps" 'ssh target "set -x && \
+            sudo apt-get update && \
+            sudo apt-get install -y build-essential gcc g++ libc6 libstdc++6 \
+              libgcc1 libgpiod2 libudev1 && \
+            sudo ldconfig && \
+            echo \"Installed packages:\" && \
+            dpkg -l | grep -E \"libc6|libstdc\""'
           
           echo "Deploying blink binary..."
           retry_command "Copying binary" 'scp -v build/blink target:/home/pi/app/'
@@ -438,12 +442,26 @@ jobs:
           retry_command "System info" 'ssh target "uname -a && cat /proc/cpuinfo | grep -i model"'
           
           echo "Checking binary dependencies:"
-          retry_command "Checking deps" 'ssh target "ldd /home/pi/app/blink || { echo \"Error: Missing dependencies\"; exit 1; }"'
+          retry_command "Checking deps" 'ssh target "set -x && \
+            echo \"System libraries:\" && \
+            ls -l /lib/aarch64-linux-gnu/libc.so* /usr/lib/aarch64-linux-gnu/libstdc++.so* && \
+            echo \"\nBinary info:\" && \
+            file /home/pi/app/blink && \
+            echo \"\nDependency check:\" && \
+            ldd /home/pi/app/blink || { \
+              echo \"Error: Missing dependencies\"; \
+              readelf -d /home/pi/app/blink; \
+              exit 1; \
+            }"'
           
           echo "Checking GPIO access:"
           retry_command "GPIO check" 'ssh target "sudo ls -l /sys/class/gpio/ && groups pi"'
           
           echo "Running blink program:"
           retry_command "Executing binary" 'ssh target "cd /home/pi/app && \
+            echo \"Current directory:\" && pwd && \
+            echo \"\nBinary permissions:\" && ls -l blink && \
+            echo \"\nSystem architecture:\" && uname -a && \
+            echo \"\nExecuting binary:\" && \
             sudo bash -c \"export LD_LIBRARY_PATH=/lib:/usr/lib:/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu && \
-            /home/pi/app/blink\""'
+              strace -f /home/pi/app/blink 2>&1\""'
