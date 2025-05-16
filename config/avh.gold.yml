@@ -1,0 +1,74 @@
+name: Arm IoT AVH Configuration
+version: 1.0.0
+
+# Device configuration
+device:
+  name: raspberry-pi-4
+  type: arm64
+  # Hardware configuration
+  hardware:
+    cpu: 4
+    memory: 4GB
+    storage: 8GB
+  # GPIO configuration
+  gpio:
+    enabled: true
+    pins:
+      - type: BUTTON
+        pin: 18  # Match our blink program's LED_PIN
+
+# Network configuration
+network:
+  enabled: true
+  type: user
+  interfaces:
+    - name: eth0
+      type: ethernet
+      dhcp: true
+
+# SSH configuration
+ssh:
+  enabled: true
+  port: 22
+  authorized_keys:
+    - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDm0fyHb6n0WOXiTKYQ8jlfFTGS1ajtpeSO74l1AiT1eQjpPjiAipf7+gARdqjH1r3HWNF5g4BmE3IBty19Dkt9hXgU8kJz+5Yo80qLuH7GmeeSoQOBmh6XGpf6am78xNxLMf1AdO5n1XZP5eCQsC93p7F6cD3feqpZqwCXnIHtCv4r7zy1odIwTge3fqAAlLsyCb2xBysSil+yryCGhvQaXnG2diU+KGeH2mQlMyDT39U3+gwUJDnvRy7ICN1tw0H93cMMGQT0lJY2D/VoXfZc7j6G9U6jR6yS6DHg64sZPtxZVCcjAyL5A9cc7PzDEMgOTSz8hZsWtEn9EsUCwqsjTYP7+RYaWvZDHY3FlT74trd/F51lHqWZMvOvgNliRD4LeA/eh/+9rpFVXPEou/R1MXYusRfLHIvF9S6L6B9S9q8pBphjEMWVPZzv2e9qcTTvbUoGz9hg48R0TuXNG96Pyenp2lVvVFTw95HjnnrPCMCfPlurwbYhkJvLcxsM86nwhO4oNnJR98ayd+wJ78BamKBQncee7+ychBvMfZSRfgg5D41S+d0d3eupos1fZPCd5zk3K3uPoNeNTITrH80r8gbyHxAbJINa3DxPJB972jDfpzvr6w7VzmRdpLw5KfpVxJbCIwVA46upmfCDXpAz+8hFbBIC1+vNRVDD2dOMYQ== claynelson@corellium.com"
+
+# Debug configuration
+debug:
+  enabled: true
+  port: 8888
+  level: debug
+  options:
+    - gdb
+    - core-dumps
+
+# Storage configuration
+storage:
+  enabled: true
+  size: 8GB
+  type: ext4
+  mount_point: /data
+
+# Security configuration
+security:
+  selinux: disabled
+  firewall:
+    enabled: false
+  sudo:
+    enabled: true
+    nopasswd: true
+
+# System configuration
+system:
+  hostname: avh-arm-iot
+  timezone: UTC
+  locale: en_US.UTF-8
+  environment:
+    - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    - TERM=xterm-256color
+
+# Logging configuration
+logging:
+  enabled: true
+  level: info
+  output: /var/log/avh.log
