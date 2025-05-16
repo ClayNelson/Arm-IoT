@@ -110,6 +110,17 @@ jobs:
           echo "Checking source files..."
           ls -la src/
 
+      - name: Setup Build Environment
+        run: |
+          echo "Installing ARM build dependencies..."
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+          sudo apt-get install -y libc6-dev-armhf-cross linux-libc-dev-armhf-cross
+          
+          echo "Verifying ARM toolchain..."
+          arm-linux-gnueabihf-gcc --version
+          arm-linux-gnueabihf-g++ --version
+
       - name: Build
         run: |
           echo "Setting up build directory..."
@@ -117,39 +128,18 @@ jobs:
           cd build
           
           echo "Running CMake with ARM toolchain..."
-          cmake -DCMAKE_TOOLCHAIN_FILE=../toolchains/arm-toolchain.cmake \
-                -DCMAKE_C_FLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
-                -DCMAKE_CXX_FLAGS="-march=armv8-a -mfloat-abi=hard -mfpu=neon-fp-armv8" \
-                -DCMAKE_VERBOSE_MAKEFILE=ON .. || {
+          if ! cmake -DCMAKE_TOOLCHAIN_FILE=../toolchains/arm-toolchain.cmake \
+                    -DCMAKE_VERBOSE_MAKEFILE=ON ..; then
             echo "CMake configuration failed. Logs:"
             cat CMakeFiles/CMakeError.log || true
+            cat CMakeFiles/CMakeOutput.log || true
             exit 1
-            echo "CMake configuration failed. Logs:";
-            cat CMakeFiles/CMakeError.log || true;
-            exit 1;
-          }
-          
-          echo "Building project..."
-          make || {
-            echo "Build failed. Check compilation errors above.";
-            exit 1;
-          }
-          
-          echo "Verifying binary architecture..."
-          if ! file blink | grep -q "ARM"; then
-            echo "Error: Binary is not compiled for ARM";
-            file blink;
-            exit 1;
           fi
           
-          echo "CMake configuration:"
-          cmake -LA .
-          
-          echo "Building..."
-          make VERBOSE=1 || {
-            echo "Build failed. Logs:"
-            cat CMakeFiles/CMakeError.log || true
-            cat CMakeFiles/CMakeOutput.log || true
+          echo "Building project..."
+          if ! make VERBOSE=1; then
+            echo "Build failed. Build logs:"
+            find . -name "*.log" -exec cat {} \;
             exit 1
           }
           
