@@ -421,23 +421,23 @@ jobs:
           retry_command "Installing deps" 'ssh target "set -x && \
             sudo dpkg --add-architecture armhf && \
             sudo apt-get update && \
-            sudo apt-get install -y multiarch-support && \
             sudo apt-get install -y \
               libc6:armhf \
+              libc6-dev:armhf \
               libstdc++6:armhf \
               libgcc1:armhf \
               libgpiod2:armhf \
               libudev1:armhf \
               strace && \
             sudo mkdir -p /lib/arm-linux-gnueabihf /usr/lib/arm-linux-gnueabihf && \
-            sudo ln -sf /lib/ld-linux-armhf.so.3 /lib/arm-linux-gnueabihf/ && \
+            sudo ln -sf /lib/arm-linux-gnueabihf/ld-linux-armhf.so.3 /lib/ld-linux-armhf.so.3 && \
             sudo ldconfig && \
             echo \"System architecture:\" && \
             uname -a && \
             echo \"\nInstalled packages:\" && \
             dpkg -l | grep -E \"libc6|libstdc\" && \
             echo \"\nLibrary paths:\" && \
-            ls -l /lib/arm-linux-gnueabihf/ld-linux-armhf.so.3 && \
+            ls -l /lib/ld-linux-armhf.so.3 /lib/arm-linux-gnueabihf/ld-linux-armhf.so.3 || true && \
             sudo ldconfig -v | grep -E \"/lib/arm-linux-gnueabihf|/usr/lib/arm-linux-gnueabihf\" && \
             echo \"\nLibrary cache:\" && \
             sudo ldconfig -p | grep -E \"ld-linux-armhf|libc.so|libstdc\""'
