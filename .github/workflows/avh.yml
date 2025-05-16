@@ -234,11 +234,14 @@ jobs:
           PROXY="3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com"
           TARGET="pi@10.11.0.1"
           
-          echo "Ensuring correct permissions for target directory..."
-          ssh -J $PROXY $TARGET 'sudo mkdir -p ~/app && sudo chown pi:pi ~/app && chmod 755 ~/app'
+          echo "Creating and fixing permissions for target directory..."
+          ssh -o ConnectTimeout=10 -J $PROXY $TARGET "sudo mkdir -p /home/pi/app && sudo chown -R pi:pi /home/pi/app && sudo chmod -R 755 /home/pi/app"
+          
+          echo "Verifying directory permissions..."
+          ssh -o ConnectTimeout=10 -J $PROXY $TARGET "ls -ld /home/pi/app"
           
           echo "Setting up GPIO directory..."
-          ssh -J $PROXY $TARGET 'sudo mkdir -p /sys/class/gpio && sudo chmod -R 777 /sys/class/gpio'
+          ssh -o ConnectTimeout=10 -J $PROXY $TARGET "sudo mkdir -p /sys/class/gpio && sudo chmod -R 777 /sys/class/gpio"
 
       - name: Deploy to AVH
         run: |
@@ -246,7 +249,10 @@ jobs:
           TARGET="pi@10.11.0.1"
           
           echo "Deploying blink binary..."
-          scp -o ProxyJump=$PROXY build/blink $TARGET:~/app/
+          scp -o ConnectTimeout=10 -o ProxyJump=$PROXY build/blink $TARGET:/home/pi/app/
+          
+          echo "Setting executable permissions..."
+          ssh -o ConnectTimeout=10 -J $PROXY $TARGET "chmod +x /home/pi/app/blink"
           
           echo "Running blink program..."
-          ssh -J $PROXY $TARGET 'chmod +x ~/app/blink && ~/app/blink'
+          ssh -o ConnectTimeout=10 -J $PROXY $TARGET "/home/pi/app/blink"
