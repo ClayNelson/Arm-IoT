@@ -229,30 +229,72 @@ jobs:
             exit 1
           fi
 
-      - name: Fix Target Directory Permissions
+      - name: Verify Build Output
+        run: |
+          echo "Verifying blink binary..."
+          if [ ! -f "build/blink" ]; then
+            echo "Error: build/blink binary not found!"
+            ls -la build/
+            exit 1
+          fi
+          
+          echo "Binary details:"
+          file build/blink
+          readelf -h build/blink || true
+
+      - name: Test SSH Connection
+        run: |
+          PROXY="3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com"
+          TARGET="pi@10.11.0.1"
+          
+          echo "Testing SSH connection..."
+          if ! ssh -o ConnectTimeout=10 -v -J $PROXY $TARGET 'whoami && echo "SSH_CONNECTION=$SSH_CONNECTION"'; then
+            echo "SSH connection failed"
+            exit 1
+          fi
+
+      - name: Setup Target Environment
         run: |
           PROXY="3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com"
           TARGET="pi@10.11.0.1"
           
           echo "Creating and fixing permissions for target directory..."
-          ssh -o ConnectTimeout=10 -J $PROXY $TARGET "sudo mkdir -p /home/pi/app && sudo chown -R pi:pi /home/pi/app && sudo chmod -R 755 /home/pi/app"
-          
-          echo "Verifying directory permissions..."
-          ssh -o ConnectTimeout=10 -J $PROXY $TARGET "ls -ld /home/pi/app"
+          if ! ssh -o ConnectTimeout=10 -J $PROXY $TARGET "sudo rm -rf /home/pi/app && sudo mkdir -p /home/pi/app && sudo chown -R pi:pi /home/pi/app && sudo chmod -R 755 /home/pi/app"; then
+            echo "Failed to set up target directory"
+            exit 1
+          fi
           
           echo "Setting up GPIO directory..."
-          ssh -o ConnectTimeout=10 -J $PROXY $TARGET "sudo mkdir -p /sys/class/gpio && sudo chmod -R 777 /sys/class/gpio"
+          if ! ssh -o ConnectTimeout=10 -J $PROXY $TARGET "sudo mkdir -p /sys/class/gpio && sudo chmod -R 777 /sys/class/gpio"; then
+            echo "Failed to set up GPIO directory"
+            exit 1
+          fi
+          
+          echo "Checking target environment:"
+          ssh -o ConnectTimeout=10 -J $PROXY $TARGET "ls -ld /home/pi/app && ls -ld /sys/class/gpio"
 
-      - name: Deploy to AVH
+      - name: Deploy and Verify
         run: |
           PROXY="3ac4e20f-02f4-45bb-bfbd-9f6e3029f981@proxy.app.avh.corellium.com"
           TARGET="pi@10.11.0.1"
           
           echo "Deploying blink binary..."
-          scp -o ConnectTimeout=10 -o ProxyJump=$PROXY build/blink $TARGET:/home/pi/app/
+          if ! scp -v -o ConnectTimeout=10 -o ProxyJump=$PROXY build/blink $TARGET:/home/pi/app/; then
+            echo "Failed to copy binary to target"
+            exit 1
+          fi
           
           echo "Setting executable permissions..."
-          ssh -o ConnectTimeout=10 -J $PROXY $TARGET "chmod +x /home/pi/app/blink"
+          if ! ssh -o ConnectTimeout=10 -J $PROXY $TARGET "chmod +x /home/pi/app/blink"; then
+            echo "Failed to set executable permissions"
+            exit 1
+          fi
+          
+          echo "Checking binary on target:"
+          ssh -o ConnectTimeout=10 -J $PROXY $TARGET "ls -l /home/pi/app/blink && file /home/pi/app/blink && ldd /home/pi/app/blink || true"
           
           echo "Running blink program..."
-          ssh -o ConnectTimeout=10 -J $PROXY $TARGET "/home/pi/app/blink"
+          if ! ssh -o ConnectTimeout=10 -J $PROXY $TARGET "/home/pi/app/blink"; then
+            echo "Failed to execute binary"
+            exit 1
+          fi
