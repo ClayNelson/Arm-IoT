@@ -418,7 +418,7 @@ jobs:
           retry_command "Creating directory" 'ssh target "sudo mkdir -p /home/pi/app && sudo chown pi:pi /home/pi/app"'
           
           echo "Installing dependencies on target..."
-          retry_command "Installing deps" 'ssh target "sudo apt-get update && sudo apt-get install -y libc6:armhf libstdc++6:armhf"'
+          retry_command "Installing deps" 'ssh target "sudo dpkg --add-architecture armhf && sudo apt-get update && sudo apt-get install -y libc6:arm64 libstdc++6:arm64 libc6:armhf libstdc++6:armhf"'
           
           echo "Deploying blink binary..."
           retry_command "Copying binary" 'scp -v build/blink target:/home/pi/app/'
