@@ -418,7 +418,9 @@ jobs:
           retry_command "Creating directory" 'ssh target "sudo mkdir -p /home/pi/app && sudo chown pi:pi /home/pi/app"'
           
           echo "Installing dependencies on target..."
-          retry_command "Installing deps" 'ssh target "sudo dpkg --add-architecture armhf && sudo apt-get update && sudo apt-get install -y libc6:arm64 libstdc++6:arm64 libc6:armhf libstdc++6:armhf"'
+          retry_command "Installing deps" 'ssh target "sudo apt-get update && \
+            sudo apt-get install -y build-essential gcc g++ libc6 libstdc++6 && \
+            sudo ldconfig"'
           
           echo "Deploying blink binary..."
           retry_command "Copying binary" 'scp -v build/blink target:/home/pi/app/'
@@ -442,4 +444,6 @@ jobs:
           retry_command "GPIO check" 'ssh target "sudo ls -l /sys/class/gpio/ && groups pi"'
           
           echo "Running blink program:"
-          retry_command "Executing binary" 'ssh target "cd /home/pi/app && sudo LD_LIBRARY_PATH=/lib:/usr/lib /home/pi/app/blink"'
+          retry_command "Executing binary" 'ssh target "cd /home/pi/app && \
+            sudo bash -c \"export LD_LIBRARY_PATH=/lib:/usr/lib:/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu && \
+            /home/pi/app/blink\""'
